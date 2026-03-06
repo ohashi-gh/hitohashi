@@ -1,0 +1,16 @@
+{
+  "name": "ひとあし - 小さな一歩を、今日も",
+  "short_name": "ひとあし",
+  "description": "今日できる小さなチャレンジで、毎日少しずつ前に進む習慣アプリ",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#faf7f2",
+  "theme_color": "#4a7c59",
+  "lang": "ja",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["health", "lifestyle", "productivity"]
+}
