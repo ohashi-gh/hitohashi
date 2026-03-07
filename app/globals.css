@@ -10,9 +10,6 @@ html, body {
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
-  /* iOS Safe Area */
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
 }
 
 #__next, body > div {
@@ -36,7 +33,7 @@ button:not(:disabled):active {
   height: 0;
 }
 
-/* ── Animations ─────────────────────────── */
+/* 笏笏 Animations 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏 */
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
