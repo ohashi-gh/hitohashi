@@ -1160,29 +1160,59 @@ function DashScreen({ streak, history }) {
 // 通知設定画面
 // ════════════════════════════════════════════════════════════
 function NotifScreen() {
-  const [notifOn, setNotifOn]     = useState(true);
-  const [hour, setHour]           = useState(8);
-  const [minute, setMinute]       = useState(0);
-  const [saved, setSaved]         = useState(false);
+  const [notifOn, setNotifOn]       = useState(true);
+  const [hour, setHour]             = useState(8);
+  const [minute, setMinute]         = useState(0);
+  const [saved, setSaved]           = useState(false);
+  const [isDirty, setIsDirty]       = useState(false);
+  // 保存済みの設定を別途保持して「現在の設定」表示に使う
+  const [savedSettings, setSavedSettings] = useState(null);
 
   useEffect(() => {
     sget('notif-settings').then(v => {
-      if (v) { setNotifOn(v.on); setHour(v.hour); setMinute(v.minute); }
+      if (v) {
+        setNotifOn(v.on);
+        setHour(v.hour);
+        setMinute(v.minute);
+        setSavedSettings(v);
+      } else {
+        // デフォルト値を「保存済み」として扱う
+        setSavedSettings({ on: true, hour: 8, minute: 0 });
+      }
     });
   }, []);
 
+  // 設定が変更されたら「未保存」フラグを立てる
+  useEffect(() => {
+    if (!savedSettings) return;
+    const changed = notifOn !== savedSettings.on ||
+                    hour    !== savedSettings.hour ||
+                    minute  !== savedSettings.minute;
+    setIsDirty(changed);
+  }, [notifOn, hour, minute, savedSettings]);
+
   async function save() {
     haptic('success');
-    const settings = { on:notifOn, hour, minute };
+    const settings = { on: notifOn, hour, minute };
     await sset('notif-settings', settings);
     if (notifOn) {
       scheduleNotification(hour, '🌱 今日のひとあし', `${hour}時です。今日の小さなチャレンジを始めませんか？`);
+    } else {
+      // ネイティブ側の通知もキャンセル
+      if (isNative && window.nativeApp?.cancelNotification) {
+        window.nativeApp.cancelNotification();
+      }
     }
+    setSavedSettings(settings);
+    setIsDirty(false);
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setTimeout(() => setSaved(false), 2500);
   }
 
   const timeStr = `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
+  const savedTimeStr = savedSettings
+    ? `${String(savedSettings.hour).padStart(2,'0')}:${String(savedSettings.minute).padStart(2,'0')}`
+    : '08:00';
 
   return (
     <div style={{padding:'0 16px 100px'}}>
@@ -1191,7 +1221,47 @@ function NotifScreen() {
         <p style={{fontSize:13,color:T.inkL,marginTop:4}}>毎日のリマインダーを設定しよう</p>
       </div>
 
-      {/* ON/OFF */}
+      {/* ── 現在の設定バナー ── */}
+      <div style={{
+        background: savedSettings?.on
+          ? `linear-gradient(135deg,${T.sage},${T.sageL})`
+          : T.sand,
+        borderRadius: 16,
+        padding: '14px 18px',
+        marginBottom: 16,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+      }}>
+        <span style={{fontSize: 28, flexShrink: 0}}>
+          {savedSettings?.on ? '🔔' : '🔕'}
+        </span>
+        <div style={{flex: 1}}>
+          <p style={{fontSize: 11, fontWeight: 700,
+            color: savedSettings?.on ? 'rgba(255,255,255,0.75)' : T.inkL,
+            letterSpacing: '0.08em', marginBottom: 2}}>
+            現在の設定
+          </p>
+          {savedSettings?.on ? (
+            <p style={{fontSize: 17, fontWeight: 900, color: '#fff', margin: 0}}>
+              毎日 {savedTimeStr} に通知
+            </p>
+          ) : (
+            <p style={{fontSize: 15, fontWeight: 700, color: T.inkM, margin: 0}}>
+              通知オフ
+            </p>
+          )}
+        </div>
+        {/* 未保存バッジ */}
+        {isDirty && (
+          <span style={{background:'rgba(255,255,255,0.25)',color: savedSettings?.on?'#fff':T.inkM,
+            fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:99,flexShrink:0}}>
+            未保存
+          </span>
+        )}
+      </div>
+
+      {/* ── ON/OFF ── */}
       <Card style={{marginBottom:12,padding:'18px 20px'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
           <div>
@@ -1205,7 +1275,7 @@ function NotifScreen() {
         </div>
       </Card>
 
-      {/* 時刻設定 */}
+      {/* ── 時刻設定 ── */}
       {notifOn && (
         <Card style={{marginBottom:12,padding:'20px'}}>
           <p style={{fontSize:13,fontWeight:700,color:T.inkL,letterSpacing:'0.08em',marginBottom:16}}>通知時刻</p>
@@ -1237,10 +1307,12 @@ function NotifScreen() {
         </Card>
       )}
 
-      {/* メッセージプレビュー */}
+      {/* ── 通知プレビュー ── */}
       {notifOn && (
         <Card style={{marginBottom:16,padding:'14px 18px',background:T.sageXL,border:'none'}}>
-          <p style={{fontSize:11,fontWeight:700,color:T.sage,marginBottom:6,letterSpacing:'0.08em'}}>通知プレビュー</p>
+          <p style={{fontSize:11,fontWeight:700,color:T.sage,marginBottom:6,letterSpacing:'0.08em'}}>
+            保存後の通知イメージ
+          </p>
           <div style={{background:T.white,borderRadius:12,padding:'10px 14px',boxShadow:'0 2px 8px rgba(0,0,0,0.06)'}}>
             <p style={{fontSize:12,color:T.inkL,marginBottom:2}}>{timeStr}</p>
             <p style={{fontSize:13,fontWeight:700,color:T.ink,marginBottom:2}}>🌱 今日のひとあし</p>
@@ -1249,8 +1321,11 @@ function NotifScreen() {
         </Card>
       )}
 
-      <Btn onClick={save} variant="primary" style={{width:'100%',padding:16,fontSize:16}}>
-        {saved ? '✅ 保存しました！' : '通知を設定する'}
+      {/* ── 保存ボタン ── */}
+      <Btn onClick={save} variant={isDirty ? 'amber' : 'primary'} style={{width:'100%',padding:16,fontSize:16}}>
+        {saved   ? '✅ 保存しました！' :
+         isDirty ? '💾 変更を保存する' :
+                   '✅ 保存済み'}
       </Btn>
 
       {!notifOn && (
@@ -1263,20 +1338,477 @@ function NotifScreen() {
 }
 
 // ════════════════════════════════════════════════════════════
+// オンボーディング
+// ════════════════════════════════════════════════════════════
+const ONBOARDING_SLIDES = [
+  {
+    icon:'🌱',
+    bg:`linear-gradient(160deg,#c6f0d4,#e8f4ec)`,
+    title:'ひとあし、へようこそ',
+    desc:'完璧じゃなくていい。\n今日できる小さな一歩を、一緒に踏み出しましょう。',
+  },
+  {
+    icon:'⏱️',
+    bg:`linear-gradient(160deg,#fef3c7,#fdf0d5)`,
+    title:'1〜5分でできる\n25種のチャレンジ',
+    desc:'体・心・仕事・家・つながり。\n音声ガイド付きで、迷わず動ける。',
+  },
+  {
+    icon:'🔥',
+    bg:`linear-gradient(160deg,#fbeae8,#fde8cc)`,
+    title:'続けることで\n自分が変わる',
+    desc:'毎日ひとあし踏み出すだけ。\nストリークが積み重なるほど、自信になる。',
+  },
+  {
+    icon:'💬',
+    bg:`linear-gradient(160deg,#ede9fe,#dbeafe)`,
+    title:'みんなと\n一緒に続ける',
+    desc:'匿名の掲示板で今日の一歩をシェア。\n誰かの言葉が、明日の自分を動かす。',
+  },
+];
+
+function OnboardingScreen({ onFinish }) {
+  const [slide, setSlide]   = useState(0);
+  const [name, setName]     = useState('');
+  const [notif, setNotif]   = useState(true);
+  const [animKey, setAnimKey] = useState(0);
+  const isLast = slide === ONBOARDING_SLIDES.length;
+  const s = ONBOARDING_SLIDES[slide] || null;
+
+  function next() {
+    haptic('light');
+    if (slide < ONBOARDING_SLIDES.length) {
+      setAnimKey(k => k + 1);
+      setSlide(s => s + 1);
+    }
+  }
+
+  async function finish() {
+    haptic('success');
+    await sset('onboarded', true);
+    await sset('user-name', name || 'あなた');
+    if (notif) scheduleNotification(8, '🌱 今日のひとあし', '今日の小さなチャレンジが待っています。');
+    onFinish(name || 'あなた');
+  }
+
+  return (
+    <div style={{minHeight:'100vh',maxWidth:430,margin:'0 auto',fontFamily:"'Zen Kaku Gothic New',sans-serif",display:'flex',flexDirection:'column'}}>
+
+      {/* スライド */}
+      {!isLast && s && (
+        <div key={animKey} style={{flex:1,background:s.bg,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 32px 32px',animation:'fadeUp 0.4s ease'}}>
+          <div style={{fontSize:96,marginBottom:32,animation:'float 3s ease-in-out infinite'}}>{s.icon}</div>
+          <h1 style={{fontSize:26,fontWeight:900,color:T.ink,textAlign:'center',lineHeight:1.35,marginBottom:16,whiteSpace:'pre-line'}}>{s.title}</h1>
+          <p style={{fontSize:15,color:T.inkM,textAlign:'center',lineHeight:1.8,fontFamily:"'Noto Serif JP',serif",whiteSpace:'pre-line'}}>{s.desc}</p>
+        </div>
+      )}
+
+      {/* 最終スライド：設定 */}
+      {isLast && (
+        <div style={{flex:1,background:`linear-gradient(160deg,${T.sageXL},${T.cream})`,display:'flex',flexDirection:'column',padding:'52px 24px 32px',animation:'fadeUp 0.4s ease'}}>
+          <div style={{textAlign:'center',marginBottom:32}}>
+            <div style={{fontSize:64,marginBottom:16}}>👋</div>
+            <h1 style={{fontSize:24,fontWeight:900,color:T.ink,marginBottom:8}}>はじめましょう！</h1>
+            <p style={{fontSize:14,color:T.inkM}}>あなたのことを教えてください</p>
+          </div>
+          {/* 名前入力 */}
+          <Card style={{padding:'18px 20px',marginBottom:12}}>
+            <p style={{fontSize:13,fontWeight:700,color:T.inkL,marginBottom:10,letterSpacing:'0.06em'}}>あなたのニックネーム（任意）</p>
+            <input value={name} onChange={e => setName(e.target.value)}
+              placeholder="例：さくら、たろう、匿名さん…"
+              style={{width:'100%',padding:'12px 14px',borderRadius:12,border:`1.5px solid ${T.border}`,fontSize:15,fontFamily:'inherit',color:T.ink,background:T.cream}}/>
+          </Card>
+          {/* 通知 */}
+          <Card style={{padding:'16px 20px',marginBottom:24}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div>
+                <p style={{fontSize:14,fontWeight:700,color:T.ink,marginBottom:2}}>🔔 毎朝8時にリマインド</p>
+                <p style={{fontSize:12,color:T.inkL}}>習慣化をサポートする通知</p>
+              </div>
+              <button onClick={() => setNotif(v => !v)}
+                style={{width:50,height:28,borderRadius:99,background:notif?T.sage:T.border,border:'none',cursor:'pointer',position:'relative',transition:'all 0.2s'}}>
+                <div style={{width:22,height:22,borderRadius:'50%',background:T.white,position:'absolute',top:3,left:notif?25:3,transition:'all 0.2s',boxShadow:'0 1px 4px rgba(0,0,0,0.2)'}}/>
+              </button>
+            </div>
+          </Card>
+          <Btn onClick={finish} variant="primary" style={{width:'100%',padding:18,fontSize:18}}>
+            🌱 はじめる
+          </Btn>
+        </div>
+      )}
+
+      {/* 下部ナビ */}
+      <div style={{background:T.white,padding:'20px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',borderTop:`1px solid ${T.border}`}}>
+        {/* ドット */}
+        <div style={{display:'flex',gap:6}}>
+          {[...ONBOARDING_SLIDES, {}].map((_,i) => (
+            <div key={i} style={{width:i===slide?20:8,height:8,borderRadius:99,background:i===slide?T.sage:T.border,transition:'all 0.3s'}}/>
+          ))}
+        </div>
+        {!isLast && (
+          <div style={{display:'flex',gap:12,alignItems:'center'}}>
+            <button onClick={async () => { await sset('onboarded', true); onFinish('あなた'); }}
+              style={{background:'none',border:'none',fontSize:13,color:T.inkL,cursor:'pointer',fontFamily:'inherit'}}>スキップ</button>
+            <Btn onClick={next} variant="primary" style={{padding:'12px 24px'}}>次へ →</Btn>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// 祝福エフェクト（Confetti）
+// ════════════════════════════════════════════════════════════
+function CelebrationEffect({ challenge, streak, onClose }) {
+  const [particles, setParticles] = useState([]);
+  const [phase, setPhase] = useState('boom'); // boom → show → fade
+
+  useEffect(() => {
+    // パーティクル生成
+    const p = Array.from({length: 28}, (_, i) => ({
+      id: i,
+      x: 30 + Math.random() * 40,
+      y: 20 + Math.random() * 30,
+      vx: (Math.random() - 0.5) * 8,
+      vy: -(Math.random() * 6 + 4),
+      rotate: Math.random() * 360,
+      color: [T.sage, T.amber, T.rose, T.purple, T.teal, '#f9a825'][Math.floor(Math.random() * 6)],
+      shape: ['■', '●', '▲', '★'][Math.floor(Math.random() * 4)],
+      size: 8 + Math.random() * 10,
+    }));
+    setParticles(p);
+
+    const t1 = setTimeout(() => setPhase('show'), 100);
+    const t2 = setTimeout(() => setPhase('fade'), 2800);
+    const t3 = setTimeout(() => onClose(), 3400);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, []);
+
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.45)',backdropFilter:'blur(4px)',opacity:phase==='fade'?0:1,transition:'opacity 0.6s'}}>
+
+      {/* パーティクル */}
+      {particles.map(p => (
+        <div key={p.id} style={{
+          position:'absolute',
+          left:`${p.x}%`, top:`${p.y}%`,
+          color: p.color, fontSize: p.size,
+          transform: phase==='show' ? `translate(${p.vx*18}px,${p.vy*18}px) rotate(${p.rotate+180}deg)` : `translate(0,0) rotate(${p.rotate}deg)`,
+          opacity: phase==='show' ? 0 : 1,
+          transition: 'all 1.6s cubic-bezier(0.1,0.8,0.3,1)',
+          pointerEvents:'none',
+        }}>{p.shape}</div>
+      ))}
+
+      {/* メインカード */}
+      <div style={{background:T.white,borderRadius:28,padding:'36px 32px',textAlign:'center',maxWidth:320,width:'calc(100% - 48px)',boxShadow:'0 20px 60px rgba(0,0,0,0.25)',animation:'countPop 0.5s ease',position:'relative',zIndex:1}}>
+        <div style={{fontSize:72,marginBottom:8,animation:'float 2s ease-in-out infinite'}}>{challenge.icon}</div>
+        <h2 style={{fontSize:26,fontWeight:900,color:T.ink,marginBottom:6}}>完了！✨</h2>
+        <p style={{fontSize:16,color:T.inkM,marginBottom:20,fontFamily:"'Noto Serif JP',serif",lineHeight:1.7}}>{challenge.title}を<br/>やり遂げました。</p>
+
+        {/* ストリーク */}
+        <div style={{background:`linear-gradient(135deg,${T.amber},#f0bc60)`,borderRadius:16,padding:'12px 20px',marginBottom:20,display:'inline-flex',alignItems:'center',gap:10}}>
+          <span style={{fontSize:28}}>🔥</span>
+          <div style={{textAlign:'left'}}>
+            <p style={{fontSize:11,color:'rgba(255,255,255,0.8)',margin:0}}>連続記録</p>
+            <p style={{fontSize:22,fontWeight:900,color:T.white,margin:0}}>{streak}日目</p>
+          </div>
+        </div>
+
+        {/* メッセージ */}
+        <p style={{fontSize:13,color:T.inkL,marginBottom:24,lineHeight:1.7}}>
+          {streak === 1 ? '🌱 最初の一歩を踏み出しました！' :
+           streak < 7  ? `${streak}日連続！調子いいですね。` :
+           streak < 30 ? `${streak}日連続！習慣になってきた！` :
+           `${streak}日連続！もう止まれない🔥`}
+        </p>
+
+        <button onClick={onClose}
+          style={{width:'100%',padding:14,borderRadius:16,background:`linear-gradient(135deg,${T.sage},${T.sageL})`,border:'none',fontSize:16,fontWeight:700,color:T.white,cursor:'pointer',boxShadow:`0 4px 20px ${T.sage}55`}}>
+          閉じる
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// プロフィール・設定画面
+// ════════════════════════════════════════════════════════════
+function ProfileScreen({ userName, streak, onNameChange }) {
+  const [editing, setEditing] = useState(false);
+  const [nameInput, setNameInput] = useState(userName);
+  const [resetConfirm, setResetConfirm] = useState(false);
+
+  async function saveName() {
+    haptic('light');
+    await sset('user-name', nameInput);
+    onNameChange(nameInput);
+    setEditing(false);
+  }
+
+  async function resetAll() {
+    haptic('error');
+    await sset('today-done', false);
+    await sset('streak', 0);
+    await sset('history', {});
+    await sset('goals', []);
+    setResetConfirm(false);
+    window.location.reload();
+  }
+
+  const joinDate = new Date();
+  joinDate.setDate(joinDate.getDate() - streak);
+
+  return (
+    <div style={{padding:'0 16px 100px'}}>
+      <div style={{padding:'52px 0 20px'}}>
+        <h2 style={{fontSize:22,fontWeight:900,color:T.ink}}>プロフィール 👤</h2>
+      </div>
+
+      {/* アバター＋名前 */}
+      <div style={{textAlign:'center',marginBottom:24}}>
+        <div style={{width:88,height:88,borderRadius:'50%',background:`linear-gradient(135deg,${T.sage},${T.sageL})`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:40,margin:'0 auto 12px',boxShadow:`0 6px 24px ${T.sage}44`}}>
+          🌱
+        </div>
+        {editing ? (
+          <div style={{display:'flex',gap:8,alignItems:'center',justifyContent:'center'}}>
+            <input value={nameInput} onChange={e => setNameInput(e.target.value)}
+              style={{padding:'8px 14px',borderRadius:12,border:`1.5px solid ${T.sage}`,fontSize:16,fontFamily:'inherit',textAlign:'center',width:160,color:T.ink,background:T.cream}}
+              autoFocus/>
+            <button onClick={saveName} style={{padding:'8px 14px',borderRadius:12,background:T.sage,border:'none',color:T.white,fontWeight:700,fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>保存</button>
+          </div>
+        ) : (
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+            <p style={{fontSize:22,fontWeight:900,color:T.ink}}>{userName}</p>
+            <button onClick={() => setEditing(true)} style={{background:T.sageXL,border:'none',borderRadius:8,padding:'4px 8px',fontSize:12,color:T.sage,cursor:'pointer',fontWeight:700}}>編集</button>
+          </div>
+        )}
+        <p style={{fontSize:12,color:T.inkL,marginTop:4}}>{streak}日目のひとあし旅</p>
+      </div>
+
+      {/* 実績バッジ */}
+      <Card style={{padding:'18px 20px',marginBottom:12}}>
+        <p style={{fontSize:12,fontWeight:700,color:T.inkL,letterSpacing:'0.1em',marginBottom:14}}>実績バッジ</p>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+          {[
+            {icon:'🌱', label:'はじめの一歩', unlocked: streak >= 1},
+            {icon:'🔥', label:'3日連続',      unlocked: streak >= 3},
+            {icon:'⭐', label:'1週間',        unlocked: streak >= 7},
+            {icon:'🏆', label:'1ヶ月',        unlocked: streak >= 30},
+            {icon:'💎', label:'100日',        unlocked: streak >= 100},
+            {icon:'🎯', label:'全カテゴリ',   unlocked: false},
+          ].map(b => (
+            <div key={b.label} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4,width:64,opacity:b.unlocked?1:0.3}}>
+              <div style={{width:48,height:48,borderRadius:'50%',background:b.unlocked?`linear-gradient(135deg,${T.amber},#f0bc60)`:T.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,boxShadow:b.unlocked?`0 4px 12px ${T.amber}55`:'none'}}>
+                {b.icon}
+              </div>
+              <p style={{fontSize:10,color:b.unlocked?T.inkM:T.inkL,textAlign:'center',lineHeight:1.3}}>{b.label}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* 統計 */}
+      <Card style={{padding:'18px 20px',marginBottom:12}}>
+        <p style={{fontSize:12,fontWeight:700,color:T.inkL,letterSpacing:'0.1em',marginBottom:12}}>統計</p>
+        {[
+          {label:'現在のストリーク', value:`${streak}日`},
+          {label:'アプリを始めた日', value:`${joinDate.getMonth()+1}月${joinDate.getDate()}日`},
+          {label:'お気に入りカテゴリ', value:'体 💪'},
+        ].map(s => (
+          <div key={s.label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:`1px solid ${T.border}`}}>
+            <p style={{fontSize:14,color:T.inkM}}>{s.label}</p>
+            <p style={{fontSize:14,fontWeight:700,color:T.ink}}>{s.value}</p>
+          </div>
+        ))}
+      </Card>
+
+      {/* リセット */}
+      <Card style={{padding:'16px 20px',marginBottom:12}}>
+        <p style={{fontSize:13,fontWeight:700,color:T.ink,marginBottom:4}}>データをリセット</p>
+        <p style={{fontSize:12,color:T.inkL,marginBottom:12}}>ストリーク・履歴・目標がすべて削除されます</p>
+        {!resetConfirm ? (
+          <button onClick={() => setResetConfirm(true)}
+            style={{width:'100%',padding:12,borderRadius:12,border:`1.5px solid ${T.rose}`,background:'transparent',color:T.rose,fontWeight:700,fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>
+            リセットする
+          </button>
+        ) : (
+          <div style={{display:'flex',gap:8}}>
+            <Btn onClick={() => setResetConfirm(false)} variant="ghost" style={{flex:1,padding:12}}>キャンセル</Btn>
+            <button onClick={resetAll}
+              style={{flex:1,padding:12,borderRadius:12,border:'none',background:T.rose,color:T.white,fontWeight:700,fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>
+              本当にリセット
+            </button>
+          </div>
+        )}
+      </Card>
+
+      <p style={{fontSize:11,color:T.inkL,textAlign:'center',marginTop:16}}>ひとあし v1.0 🌱</p>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// チャレンジ履歴・カレンダー詳細
+// ════════════════════════════════════════════════════════════
+function HistoryScreen({ history }) {
+  const [selectedDate, setSelectedDate] = useState(null);
+  const now = new Date();
+  const [viewYear,  setViewYear]  = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth());
+
+  // 月のカレンダー生成
+  const firstDay  = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const blanks = (firstDay + 6) % 7; // 月曜始まり
+
+  function prevMonth() { haptic('light'); if (viewMonth === 0) { setViewYear(y=>y-1); setViewMonth(11); } else setViewMonth(m=>m-1); }
+  function nextMonth() { haptic('light'); if (viewMonth === 11) { setViewYear(y=>y+1); setViewMonth(0); } else setViewMonth(m=>m+1); }
+
+  const monthDone = Array.from({length: daysInMonth}, (_,i) => {
+    const d = new Date(viewYear, viewMonth, i+1);
+    const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    return history?.[k] || false;
+  });
+
+  const monthCount = monthDone.filter(Boolean).length;
+  const DAYS_LABEL = ['月','火','水','木','金','土','日'];
+  const MONTHS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+  return (
+    <div style={{padding:'0 16px 100px'}}>
+      <div style={{padding:'52px 0 20px'}}>
+        <h2 style={{fontSize:22,fontWeight:900,color:T.ink}}>チャレンジ履歴 📅</h2>
+        <p style={{fontSize:13,color:T.inkL,marginTop:4}}>積み重ねた記録を振り返ろう</p>
+      </div>
+
+      {/* 月ナビ */}
+      <Card style={{padding:'16px 20px',marginBottom:16}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+          <button onClick={prevMonth} style={{background:T.sageXL,border:'none',borderRadius:10,width:36,height:36,fontSize:16,cursor:'pointer'}}>‹</button>
+          <div style={{textAlign:'center'}}>
+            <p style={{fontSize:18,fontWeight:900,color:T.ink}}>{viewYear}年 {MONTHS[viewMonth]}</p>
+            <p style={{fontSize:12,color:T.sage,fontWeight:700}}>{monthCount}日達成 🌱</p>
+          </div>
+          <button onClick={nextMonth} style={{background:T.sageXL,border:'none',borderRadius:10,width:36,height:36,fontSize:16,cursor:'pointer'}}>›</button>
+        </div>
+
+        {/* 曜日ヘッダー */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:4}}>
+          {DAYS_LABEL.map(d => (
+            <div key={d} style={{textAlign:'center',fontSize:11,color:T.inkL,fontWeight:700,padding:'4px 0'}}>{d}</div>
+          ))}
+        </div>
+
+        {/* 日付グリッド */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2}}>
+          {Array.from({length: blanks}).map((_,i) => <div key={`b${i}`}/>)}
+          {Array.from({length: daysInMonth}, (_,i) => {
+            const day = i + 1;
+            const done = monthDone[i];
+            const isToday = viewYear===now.getFullYear() && viewMonth===now.getMonth() && day===now.getDate();
+            const isFuture = new Date(viewYear, viewMonth, day) > now;
+            return (
+              <button key={day} onClick={() => { if (!isFuture) { haptic('light'); setSelectedDate({year:viewYear,month:viewMonth,day}); }}}
+                style={{aspectRatio:'1',borderRadius:10,border: isToday?`2px solid ${T.sage}`:'2px solid transparent',background:done?T.sage:isFuture?'transparent':T.sageXL,display:'flex',alignItems:'center',justifyContent:'center',cursor:isFuture?'default':'pointer',flexDirection:'column',gap:1}}>
+                <span style={{fontSize:13,fontWeight:isToday?900:400,color:done?T.white:isFuture?T.border:T.ink}}>{day}</span>
+                {done && <span style={{fontSize:8,color:'rgba(255,255,255,0.8)'}}>✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* 選択日詳細 */}
+      {selectedDate && (
+        <Card style={{padding:'18px 20px',marginBottom:12,background:T.sageXL,border:'none',animation:'fadeUp 0.3s ease'}}>
+          <p style={{fontSize:14,fontWeight:700,color:T.sage,marginBottom:8}}>
+            {selectedDate.month+1}月{selectedDate.day}日
+          </p>
+          {monthDone[selectedDate.day-1] ? (
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <span style={{fontSize:28}}>🌱</span>
+              <p style={{fontSize:14,color:T.inkM,fontFamily:"'Noto Serif JP',serif"}}>この日はチャレンジを達成しました！</p>
+            </div>
+          ) : (
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <span style={{fontSize:28}}>💤</span>
+              <p style={{fontSize:14,color:T.inkM,fontFamily:"'Noto Serif JP',serif"}}>この日は休んだ日。それでいい。</p>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* 月別サマリー帯グラフ */}
+      <Card style={{padding:'18px 20px'}}>
+        <p style={{fontSize:12,fontWeight:700,color:T.inkL,letterSpacing:'0.1em',marginBottom:12}}>達成率</p>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <div style={{flex:1,background:T.border,borderRadius:99,height:10,overflow:'hidden'}}>
+            <div style={{width:`${Math.round(monthCount/daysInMonth*100)}%`,height:'100%',background:`linear-gradient(90deg,${T.sage},${T.sageL})`,borderRadius:99,transition:'width 0.6s'}}/>
+          </div>
+          <span style={{fontSize:15,fontWeight:700,color:T.sage,flexShrink:0}}>{Math.round(monthCount/daysInMonth*100)}%</span>
+        </div>
+        <p style={{fontSize:12,color:T.inkL,marginTop:8}}>{daysInMonth}日中 {monthCount}日達成</p>
+      </Card>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
 // Root
 // ════════════════════════════════════════════════════════════
+
+// BottomNavのタブを更新（プロフィール追加）
+const NAV_UPDATED = [
+  {id:'home',    icon:'🏠', label:'ホーム'},
+  {id:'board',   icon:'💬', label:'掲示板'},
+  {id:'goals',   icon:'🎯', label:'目標'},
+  {id:'history', icon:'📅', label:'履歴'},
+  {id:'profile', icon:'👤', label:'マイページ'},
+];
+
+function BottomNavNew({ current, onChange }) {
+  return (
+    <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:430,background:'rgba(250,247,242,0.96)',backdropFilter:'blur(16px)',borderTop:`1px solid ${T.border}`,display:'flex',zIndex:100}}>
+      {NAV_UPDATED.map(n => (
+        <button key={n.id} onClick={() => { haptic('light'); onChange(n.id); }}
+          style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',padding:'10px 0 12px',background:'none',border:'none',cursor:'pointer',position:'relative',gap:3}}>
+          <span style={{fontSize:20,filter:current===n.id?'none':'grayscale(0.6) opacity(0.55)'}}>{n.icon}</span>
+          <span style={{fontSize:9,fontWeight:current===n.id?'700':'400',color:current===n.id?T.sage:T.inkL}}>{n.label}</span>
+          {current===n.id && <div style={{position:'absolute',bottom:0,left:'50%',transform:'translateX(-50%)',width:24,height:3,background:T.sage,borderRadius:'99px 99px 0 0'}}/>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function Page() {
+  const [onboarded, setOnboarded]             = useState(null); // null=loading
+  const [userName, setUserName]               = useState('あなた');
   const [screen, setScreen]                   = useState('home');
   const [activeChallenge, setActiveChallenge] = useState(null);
   const [showPicker, setShowPicker]           = useState(false);
   const [todayDone, setTodayDone]             = useState(false);
   const [streak, setStreak]                   = useState(0);
   const [history, setHistory]                 = useState({});
+  const [celebration, setCelebration]         = useState(null); // {challenge, streak}
 
   useEffect(() => {
-    sget('today-done').then(v => { if (v) setTodayDone(true); });
-    sget('streak').then(v => { if (v) setStreak(v); });
-    sget('history').then(v => { if (v) setHistory(v); });
+    Promise.all([
+      sget('onboarded'),
+      sget('user-name'),
+      sget('today-done'),
+      sget('streak'),
+      sget('history'),
+    ]).then(([ob, name, done, str, hist]) => {
+      setOnboarded(!!ob);
+      if (name)  setUserName(name);
+      if (done)  setTodayDone(true);
+      if (str)   setStreak(str);
+      if (hist)  setHistory(hist);
+    });
     if (typeof window !== 'undefined' && window.speechSynthesis)
       window.speechSynthesis.getVoices();
     sget('notif-settings').then(v => {
@@ -1286,7 +1818,6 @@ export default function Page() {
   }, []);
 
   async function handleComplete() {
-    haptic('success');
     const ns = streak + 1;
     const today = todayKey();
     const newHistory = { ...history, [today]: true };
@@ -1294,7 +1825,15 @@ export default function Page() {
     await sset('today-done', true);
     await sset('streak', ns);
     await sset('history', newHistory);
+    // 祝福エフェクト表示
+    setCelebration({ challenge: activeChallenge, streak: ns });
     setActiveChallenge(null);
+    notifyChallengeComplete();
+  }
+
+  function handleOnboardingFinish(name) {
+    setUserName(name);
+    setOnboarded(true);
   }
 
   const wrapper = {
@@ -1302,11 +1841,24 @@ export default function Page() {
     margin:'0 auto', position:'relative', fontFamily:"'Zen Kaku Gothic New',sans-serif",
   };
 
+  // ローディング中
+  if (onboarded === null) return (
+    <div style={{...wrapper, display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh'}}>
+      <div style={{fontSize:48, animation:'float 2s ease-in-out infinite'}}>🌱</div>
+    </div>
+  );
+
+  // オンボーディング
+  if (!onboarded) return <OnboardingScreen onFinish={handleOnboardingFinish}/>;
+
+  // チャレンジランナー
   if (activeChallenge) return (
     <div style={wrapper}>
       <ChallengeRunner challenge={activeChallenge} onComplete={handleComplete} onBack={() => setActiveChallenge(null)}/>
     </div>
   );
+
+  // チャレンジ選択
   if (showPicker) return (
     <div style={wrapper}>
       <ChallengePicker onSelect={ch => { setActiveChallenge(ch); setShowPicker(false); }} onBack={() => setShowPicker(false)}/>
@@ -1315,12 +1867,21 @@ export default function Page() {
 
   return (
     <div style={wrapper}>
-      {screen==='home'  && <HomeScreen onStart={setActiveChallenge} onPick={() => setShowPicker(true)} onGoBoard={() => setScreen('board')} todayDone={todayDone} streak={streak}/>}
-      {screen==='board' && <BoardScreen/>}
-      {screen==='goals' && <GoalsScreen/>}
-      {screen==='dash'  && <DashScreen streak={streak} history={history}/>}
-      {screen==='notif' && <NotifScreen/>}
-      <BottomNav current={screen} onChange={setScreen} unread={0}/>
+      {/* 祝福エフェクト */}
+      {celebration && (
+        <CelebrationEffect
+          challenge={celebration.challenge}
+          streak={celebration.streak}
+          onClose={() => setCelebration(null)}
+        />
+      )}
+
+      {screen==='home'    && <HomeScreen onStart={setActiveChallenge} onPick={() => setShowPicker(true)} onGoBoard={() => setScreen('board')} todayDone={todayDone} streak={streak}/>}
+      {screen==='board'   && <BoardScreen/>}
+      {screen==='goals'   && <GoalsScreen/>}
+      {screen==='history' && <HistoryScreen history={history}/>}
+      {screen==='profile' && <ProfileScreen userName={userName} streak={streak} onNameChange={setUserName}/>}
+      <BottomNavNew current={screen} onChange={setScreen}/>
     </div>
   );
 }
