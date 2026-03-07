@@ -885,46 +885,428 @@ function BottomNav({ current, onChange, unread }) {
   );
 }
 
-function StubScreen({ title }) {
-  return <div style={{padding:'52px 16px 100px'}}><h2 style={{fontSize:22,fontWeight:900,color:T.ink,marginBottom:8}}>{title}</h2><p style={{color:T.inkL}}>近日実装予定</p></div>;
+// ════════════════════════════════════════════════════════════
+// 目標設定画面
+// ════════════════════════════════════════════════════════════
+const GOAL_TEMPLATES = [
+  { id:'health',  icon:'💪', label:'体を動かす',   desc:'毎日ストレッチや運動の習慣をつける' },
+  { id:'mind',    icon:'🧘', label:'心を整える',   desc:'呼吸法や瞑想で気持ちを落ち着かせる' },
+  { id:'work',    icon:'📚', label:'集中力を上げる', desc:'ポモドーロや片付けで生産性を高める' },
+  { id:'home',    icon:'🏠', label:'家を整える',   desc:'毎日少しずつ片付けて快適な空間に' },
+  { id:'connect', icon:'💌', label:'つながりを大切に', desc:'感謝を伝えたり人と深くつながる' },
+  { id:'custom',  icon:'✨', label:'自分で決める',  desc:'オリジナルの目標を設定する' },
+];
+
+function GoalsScreen() {
+  const [goals, setGoals]         = useState([]);
+  const [adding, setAdding]       = useState(false);
+  const [customText, setCustomText] = useState('');
+  const [freq, setFreq]           = useState(5); // 週N回
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [aiTip, setAiTip]         = useState('');
+  const [tipLoading, setTipLoading] = useState(false);
+
+  useEffect(() => {
+    sget('goals').then(v => { if (v) setGoals(v); });
+  }, []);
+
+  async function saveGoals(next) {
+    setGoals(next);
+    await sset('goals', next);
+  }
+
+  async function addGoal() {
+    if (!selectedTemplate) return;
+    const label = selectedTemplate.id === 'custom'
+      ? customText.trim()
+      : selectedTemplate.label;
+    if (!label) return;
+    const goal = {
+      id: Date.now(),
+      icon: selectedTemplate.icon,
+      label,
+      freq,
+      doneThisWeek: 0,
+      createdAt: todayKey(),
+    };
+    const next = [...goals, goal];
+    await saveGoals(next);
+    setAdding(false); setSelectedTemplate(null); setCustomText(''); setFreq(5);
+    haptic('success');
+  }
+
+  async function removeGoal(id) {
+    haptic('light');
+    await saveGoals(goals.filter(g => g.id !== id));
+  }
+
+  async function getAiTip() {
+    if (!goals.length) return;
+    setTipLoading(true); setAiTip('');
+    const labels = goals.map(g => g.label).join('、');
+    const tip = await callClaude(`習慣目標：「${labels}」\nこれらを続けるための具体的なコツを1つ、2文以内で日本語で教えてください。`);
+    setAiTip(tip); setTipLoading(false);
+  }
+
+  const doneCount = goals.reduce((a, g) => a + g.doneThisWeek, 0);
+  const totalTarget = goals.reduce((a, g) => a + g.freq, 0);
+
+  return (
+    <div style={{padding:'0 16px 100px'}}>
+      <div style={{padding:'52px 0 20px'}}>
+        <h2 style={{fontSize:22,fontWeight:900,color:T.ink}}>目標設定 🎯</h2>
+        <p style={{fontSize:13,color:T.inkL,marginTop:4}}>続けたいことを決めて、習慣にしよう</p>
+      </div>
+
+      {/* 今週の進捗サマリー */}
+      {goals.length > 0 && (
+        <Card style={{marginBottom:16,padding:'18px 20px'}}>
+          <p style={{fontSize:12,fontWeight:700,color:T.inkL,letterSpacing:'0.1em',marginBottom:10}}>今週の進捗</p>
+          <div style={{display:'flex',alignItems:'center',gap:14}}>
+            <div style={{flex:1}}>
+              <div style={{background:T.border,borderRadius:99,height:8,overflow:'hidden'}}>
+                <div style={{width:totalTarget?`${Math.min(doneCount/totalTarget*100,100)}%`:'0%',height:'100%',background:`linear-gradient(90deg,${T.sage},${T.sageL})`,borderRadius:99,transition:'width 0.5s'}}/>
+              </div>
+            </div>
+            <span style={{fontSize:15,fontWeight:700,color:T.sage,flexShrink:0}}>{doneCount}/{totalTarget}回</span>
+          </div>
+        </Card>
+      )}
+
+      {/* 目標リスト */}
+      {goals.map(g => (
+        <Card key={g.id} style={{marginBottom:12,padding:'16px 18px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <span style={{fontSize:32,flexShrink:0}}>{g.icon}</span>
+            <div style={{flex:1}}>
+              <p style={{fontSize:15,fontWeight:700,color:T.ink,marginBottom:4}}>{g.label}</p>
+              <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                <span style={{fontSize:12,color:T.inkL}}>週{g.freq}回目標</span>
+                <span style={{fontSize:12,color:T.sage,fontWeight:700}}>・今週{g.doneThisWeek}回達成</span>
+              </div>
+              {/* ドット進捗 */}
+              <div style={{display:'flex',gap:4,marginTop:8}}>
+                {Array.from({length:g.freq}).map((_,i) => (
+                  <div key={i} onClick={async () => {
+                    haptic('light');
+                    const next = goals.map(x => x.id===g.id ? {...x, doneThisWeek: i < x.doneThisWeek ? i : Math.min(i+1, x.freq)} : x);
+                    await saveGoals(next);
+                  }} style={{width:20,height:20,borderRadius:'50%',background:i<g.doneThisWeek?T.sage:T.sageXL,cursor:'pointer',transition:'all 0.2s',border:`2px solid ${i<g.doneThisWeek?T.sage:T.border}`}}/>
+                ))}
+              </div>
+            </div>
+            <button onClick={() => removeGoal(g.id)}
+              style={{background:'none',border:'none',color:T.inkL,fontSize:18,cursor:'pointer',padding:4}}>×</button>
+          </div>
+        </Card>
+      ))}
+
+      {/* AIアドバイス */}
+      {goals.length > 0 && (
+        <button onClick={getAiTip} disabled={tipLoading}
+          style={{width:'100%',padding:'12px 16px',borderRadius:14,border:`1.5px dashed ${T.sage}`,background:'transparent',cursor:'pointer',marginBottom:12,fontFamily:'inherit',color:T.sage,fontWeight:700,fontSize:14}}>
+          {tipLoading ? '考え中...' : '✨ AIにアドバイスをもらう'}
+        </button>
+      )}
+      {aiTip && (
+        <Card style={{marginBottom:16,padding:'14px 18px',background:T.sageXL,border:'none'}}>
+          <p style={{fontSize:14,color:T.sage,lineHeight:1.7,fontFamily:"'Noto Serif JP',serif",margin:0}}>🌿 {aiTip}</p>
+        </Card>
+      )}
+
+      {/* 目標追加 */}
+      {!adding ? (
+        <button onClick={() => { haptic('light'); setAdding(true); }}
+          style={{width:'100%',padding:16,borderRadius:16,border:`2px dashed ${T.border}`,background:'transparent',cursor:'pointer',fontSize:15,color:T.inkM,fontFamily:'inherit',fontWeight:700}}>
+          ＋ 目標を追加する
+        </button>
+      ) : (
+        <Card style={{padding:'18px 20px'}}>
+          <p style={{fontSize:14,fontWeight:700,color:T.ink,marginBottom:14}}>どんな習慣を作りたい？</p>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16}}>
+            {GOAL_TEMPLATES.map(t => (
+              <button key={t.id} onClick={() => setSelectedTemplate(t)}
+                style={{padding:'12px 10px',borderRadius:14,border:`2px solid ${selectedTemplate?.id===t.id?T.sage:T.border}`,background:selectedTemplate?.id===t.id?T.sageXL:'transparent',cursor:'pointer',textAlign:'left',fontFamily:'inherit',transition:'all 0.15s'}}>
+                <span style={{fontSize:22,display:'block',marginBottom:4}}>{t.icon}</span>
+                <p style={{fontSize:13,fontWeight:700,color:T.ink,margin:'0 0 2px'}}>{t.label}</p>
+                <p style={{fontSize:11,color:T.inkL,margin:0,lineHeight:1.4}}>{t.desc}</p>
+              </button>
+            ))}
+          </div>
+          {selectedTemplate?.id === 'custom' && (
+            <input value={customText} onChange={e => setCustomText(e.target.value)}
+              placeholder="目標を入力（例：毎日水を2L飲む）"
+              style={{width:'100%',padding:'10px 14px',borderRadius:12,border:`1.5px solid ${T.border}`,fontSize:14,fontFamily:'inherit',color:T.ink,background:T.cream,marginBottom:12}}/>
+          )}
+          <div style={{marginBottom:14}}>
+            <p style={{fontSize:13,color:T.inkM,marginBottom:8}}>週に何回やる？</p>
+            <div style={{display:'flex',gap:6}}>
+              {[1,2,3,4,5,6,7].map(n => (
+                <button key={n} onClick={() => setFreq(n)}
+                  style={{width:36,height:36,borderRadius:'50%',border:`2px solid ${freq===n?T.sage:T.border}`,background:freq===n?T.sage:'transparent',color:freq===n?T.white:T.inkM,fontWeight:700,fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{display:'flex',gap:10}}>
+            <Btn onClick={() => { setAdding(false); setSelectedTemplate(null); }} variant="ghost" style={{flex:1}}>キャンセル</Btn>
+            <Btn onClick={addGoal} variant="primary" style={{flex:1}} disabled={!selectedTemplate || (selectedTemplate.id==='custom' && !customText.trim())}>追加する</Btn>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// 成長の記録画面
+// ════════════════════════════════════════════════════════════
+function DashScreen({ streak, history }) {
+  const [tab, setTab] = useState('week');
+
+  // 過去30日分のダミーデータ（実際はhistoryから生成）
+  const last30 = Array.from({length:30}, (_,i) => {
+    const d = new Date(); d.setDate(d.getDate() - (29-i));
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const done = history?.[key] || (Math.random() > 0.35);
+    return { date:d, key, done, day:d.getDate(), month:d.getMonth()+1 };
+  });
+
+  const totalDone  = last30.filter(d => d.done).length;
+  const thisWeek   = last30.slice(-7);
+  const weekDone   = thisWeek.filter(d => d.done).length;
+  const longestRun = last30.reduce((acc, d) => {
+    if (d.done) { acc.cur++; acc.max = Math.max(acc.max, acc.cur); }
+    else acc.cur = 0;
+    return acc;
+  }, {cur:0,max:0}).max;
+
+  const DAYS = ['月','火','水','木','金','土','日'];
+
+  return (
+    <div style={{padding:'0 16px 100px'}}>
+      <div style={{padding:'52px 0 20px'}}>
+        <h2 style={{fontSize:22,fontWeight:900,color:T.ink}}>成長の記録 📊</h2>
+        <p style={{fontSize:13,color:T.inkL,marginTop:4}}>続けてきた自分を振り返ろう</p>
+      </div>
+
+      {/* ストリーク大表示 */}
+      <div style={{background:`linear-gradient(135deg,${T.amber},#f0bc60)`,borderRadius:24,padding:'24px 24px 20px',marginBottom:16,boxShadow:`0 8px 32px ${T.amber}44`,textAlign:'center'}}>
+        <p style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.8)',letterSpacing:'0.12em',marginBottom:8}}>現在の連続記録</p>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12}}>
+          <span style={{fontSize:56}}>🔥</span>
+          <span style={{fontSize:72,fontWeight:900,color:T.white,lineHeight:1}}>{streak}</span>
+          <span style={{fontSize:20,fontWeight:700,color:'rgba(255,255,255,0.9)'}}>日</span>
+        </div>
+        <p style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:8}}>最長記録：{longestRun}日</p>
+      </div>
+
+      {/* サマリーカード */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
+        {[
+          {label:'今週の達成',value:`${weekDone}/7日`,icon:'📅',color:T.sage},
+          {label:'今月の達成',value:`${totalDone}日`,icon:'📆',color:T.purple},
+          {label:'達成率',value:`${Math.round(totalDone/30*100)}%`,icon:'✨',color:T.teal},
+          {label:'お気に入り',value:'呼吸法',icon:'❤️',color:T.rose},
+        ].map(s => (
+          <Card key={s.label} style={{padding:'14px 16px'}}>
+            <span style={{fontSize:22,display:'block',marginBottom:6}}>{s.icon}</span>
+            <p style={{fontSize:20,fontWeight:900,color:s.color,margin:'0 0 2px'}}>{s.value}</p>
+            <p style={{fontSize:11,color:T.inkL,margin:0}}>{s.label}</p>
+          </Card>
+        ))}
+      </div>
+
+      {/* カレンダービュー */}
+      <Card style={{padding:'18px 20px',marginBottom:16}}>
+        <p style={{fontSize:12,fontWeight:700,color:T.inkL,letterSpacing:'0.1em',marginBottom:12}}>過去30日</p>
+        <div style={{display:'flex',gap:2,flexWrap:'wrap'}}>
+          {last30.map((d,i) => (
+            <div key={i} title={`${d.month}/${d.day}`}
+              style={{width:32,height:32,borderRadius:8,background:d.done?T.sage:T.sageXL,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:d.done?T.white:T.inkL,fontWeight:d.done?700:400,margin:1}}>
+              {d.day}
+            </div>
+          ))}
+        </div>
+        <div style={{display:'flex',gap:8,marginTop:12,alignItems:'center'}}>
+          <div style={{width:12,height:12,borderRadius:3,background:T.sage}}/>
+          <span style={{fontSize:11,color:T.inkL}}>達成</span>
+          <div style={{width:12,height:12,borderRadius:3,background:T.sageXL,marginLeft:8}}/>
+          <span style={{fontSize:11,color:T.inkL}}>未達成</span>
+        </div>
+      </Card>
+
+      {/* 今週の棒グラフ */}
+      <Card style={{padding:'18px 20px'}}>
+        <p style={{fontSize:12,fontWeight:700,color:T.inkL,letterSpacing:'0.1em',marginBottom:16}}>今週のチャレンジ数</p>
+        <div style={{display:'flex',gap:6,alignItems:'flex-end',height:80}}>
+          {thisWeek.map((d,i) => {
+            const h = d.done ? Math.floor(Math.random()*40)+40 : Math.floor(Math.random()*20)+5;
+            return (
+              <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+                <div style={{width:'100%',height:h,borderRadius:'6px 6px 0 0',background:d.done?`linear-gradient(180deg,${T.sageL},${T.sage})`:T.sageXL,transition:'height 0.5s'}}/>
+                <span style={{fontSize:10,color:T.inkL}}>{DAYS[i]}</span>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// 通知設定画面
+// ════════════════════════════════════════════════════════════
+function NotifScreen() {
+  const [notifOn, setNotifOn]     = useState(true);
+  const [hour, setHour]           = useState(8);
+  const [minute, setMinute]       = useState(0);
+  const [saved, setSaved]         = useState(false);
+
+  useEffect(() => {
+    sget('notif-settings').then(v => {
+      if (v) { setNotifOn(v.on); setHour(v.hour); setMinute(v.minute); }
+    });
+  }, []);
+
+  async function save() {
+    haptic('success');
+    const settings = { on:notifOn, hour, minute };
+    await sset('notif-settings', settings);
+    if (notifOn) {
+      scheduleNotification(hour, '🌱 今日のひとあし', `${hour}時です。今日の小さなチャレンジを始めませんか？`);
+    }
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  const timeStr = `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
+
+  return (
+    <div style={{padding:'0 16px 100px'}}>
+      <div style={{padding:'52px 0 20px'}}>
+        <h2 style={{fontSize:22,fontWeight:900,color:T.ink}}>通知設定 🔔</h2>
+        <p style={{fontSize:13,color:T.inkL,marginTop:4}}>毎日のリマインダーを設定しよう</p>
+      </div>
+
+      {/* ON/OFF */}
+      <Card style={{marginBottom:12,padding:'18px 20px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div>
+            <p style={{fontSize:15,fontWeight:700,color:T.ink,marginBottom:2}}>毎日リマインダー</p>
+            <p style={{fontSize:12,color:T.inkL}}>設定した時間にお知らせします</p>
+          </div>
+          <button onClick={() => { haptic('light'); setNotifOn(v => !v); }}
+            style={{width:50,height:28,borderRadius:99,background:notifOn?T.sage:T.border,border:'none',cursor:'pointer',position:'relative',transition:'all 0.2s'}}>
+            <div style={{width:22,height:22,borderRadius:'50%',background:T.white,position:'absolute',top:3,left:notifOn?25:3,transition:'all 0.2s',boxShadow:'0 1px 4px rgba(0,0,0,0.2)'}}/>
+          </button>
+        </div>
+      </Card>
+
+      {/* 時刻設定 */}
+      {notifOn && (
+        <Card style={{marginBottom:12,padding:'20px'}}>
+          <p style={{fontSize:13,fontWeight:700,color:T.inkL,letterSpacing:'0.08em',marginBottom:16}}>通知時刻</p>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12,marginBottom:20}}>
+            {/* 時 */}
+            <div style={{textAlign:'center'}}>
+              <button onClick={() => setHour(h => (h+1)%24)} style={{display:'block',width:56,padding:'8px 0',background:T.sageXL,border:'none',borderRadius:10,fontSize:18,cursor:'pointer',marginBottom:6}}>▲</button>
+              <div style={{width:56,padding:'10px 0',background:T.white,border:`2px solid ${T.sage}`,borderRadius:12,fontSize:28,fontWeight:900,color:T.ink,textAlign:'center'}}>{String(hour).padStart(2,'0')}</div>
+              <button onClick={() => setHour(h => (h+23)%24)} style={{display:'block',width:56,padding:'8px 0',background:T.sageXL,border:'none',borderRadius:10,fontSize:18,cursor:'pointer',marginTop:6}}>▼</button>
+            </div>
+            <span style={{fontSize:32,fontWeight:900,color:T.ink,marginBottom:4}}>:</span>
+            {/* 分 */}
+            <div style={{textAlign:'center'}}>
+              <button onClick={() => setMinute(m => (m+15)%60)} style={{display:'block',width:56,padding:'8px 0',background:T.sageXL,border:'none',borderRadius:10,fontSize:18,cursor:'pointer',marginBottom:6}}>▲</button>
+              <div style={{width:56,padding:'10px 0',background:T.white,border:`2px solid ${T.sage}`,borderRadius:12,fontSize:28,fontWeight:900,color:T.ink,textAlign:'center'}}>{String(minute).padStart(2,'0')}</div>
+              <button onClick={() => setMinute(m => (m+45)%60)} style={{display:'block',width:56,padding:'8px 0',background:T.sageXL,border:'none',borderRadius:10,fontSize:18,cursor:'pointer',marginTop:6}}>▼</button>
+            </div>
+          </div>
+          {/* クイック選択 */}
+          <p style={{fontSize:12,color:T.inkL,marginBottom:10}}>よく使う時間</p>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {[[6,0,'早朝'],[7,0,'朝'],[8,0,'朝'],[12,0,'昼'],[18,0,'夕方'],[21,0,'夜']].map(([h,m,label]) => (
+              <button key={h} onClick={() => { setHour(h); setMinute(m); haptic('light'); }}
+                style={{padding:'6px 14px',borderRadius:99,border:`1.5px solid ${hour===h&&minute===m?T.sage:T.border}`,background:hour===h&&minute===m?T.sageXL:'transparent',fontSize:13,color:hour===h&&minute===m?T.sage:T.inkM,cursor:'pointer',fontFamily:'inherit',fontWeight:hour===h&&minute===m?700:400}}>
+                {String(h).padStart(2,'0')}:{String(m).padStart(2,'0')} {label}
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* メッセージプレビュー */}
+      {notifOn && (
+        <Card style={{marginBottom:16,padding:'14px 18px',background:T.sageXL,border:'none'}}>
+          <p style={{fontSize:11,fontWeight:700,color:T.sage,marginBottom:6,letterSpacing:'0.08em'}}>通知プレビュー</p>
+          <div style={{background:T.white,borderRadius:12,padding:'10px 14px',boxShadow:'0 2px 8px rgba(0,0,0,0.06)'}}>
+            <p style={{fontSize:12,color:T.inkL,marginBottom:2}}>{timeStr}</p>
+            <p style={{fontSize:13,fontWeight:700,color:T.ink,marginBottom:2}}>🌱 今日のひとあし</p>
+            <p style={{fontSize:12,color:T.inkM}}>{hour}時です。今日の小さなチャレンジを始めませんか？</p>
+          </div>
+        </Card>
+      )}
+
+      <Btn onClick={save} variant="primary" style={{width:'100%',padding:16,fontSize:16}}>
+        {saved ? '✅ 保存しました！' : '通知を設定する'}
+      </Btn>
+
+      {!notifOn && (
+        <p style={{fontSize:12,color:T.inkL,textAlign:'center',marginTop:12}}>
+          通知をオフにしても、アプリを開けばいつでもチャレンジできます
+        </p>
+      )}
+    </div>
+  );
 }
 
 // ════════════════════════════════════════════════════════════
 // Root
 // ════════════════════════════════════════════════════════════
 export default function Page() {
-  const [screen, setScreen]               = useState('home');
+  const [screen, setScreen]                   = useState('home');
   const [activeChallenge, setActiveChallenge] = useState(null);
-  const [showPicker, setShowPicker]       = useState(false);
-  const [todayDone, setTodayDone]         = useState(false);
-  const [streak, setStreak]               = useState(4);
+  const [showPicker, setShowPicker]           = useState(false);
+  const [todayDone, setTodayDone]             = useState(false);
+  const [streak, setStreak]                   = useState(0);
+  const [history, setHistory]                 = useState({});
 
   useEffect(() => {
     sget('today-done').then(v => { if (v) setTodayDone(true); });
     sget('streak').then(v => { if (v) setStreak(v); });
+    sget('history').then(v => { if (v) setHistory(v); });
     if (typeof window !== 'undefined' && window.speechSynthesis)
       window.speechSynthesis.getVoices();
-    // iOSに毎朝8時の通知をスケジュール
-    scheduleNotification(8, '🌱 今日のひとあし', '今日の小さなチャレンジが待っています。');
+    sget('notif-settings').then(v => {
+      const h = v?.hour ?? 8;
+      scheduleNotification(h, '🌱 今日のひとあし', '今日の小さなチャレンジが待っています。');
+    });
   }, []);
 
   async function handleComplete() {
+    haptic('success');
     const ns = streak + 1;
-    setTodayDone(true); setStreak(ns);
+    const today = todayKey();
+    const newHistory = { ...history, [today]: true };
+    setTodayDone(true); setStreak(ns); setHistory(newHistory);
     await sset('today-done', true);
     await sset('streak', ns);
+    await sset('history', newHistory);
     setActiveChallenge(null);
   }
 
-  const wrapper = { background:T.cream, minHeight:'100vh', maxWidth:430, margin:'0 auto',
-    position:'relative', fontFamily:"'Zen Kaku Gothic New',sans-serif" };
+  const wrapper = {
+    background: T.cream, minHeight:'100vh', maxWidth:430,
+    margin:'0 auto', position:'relative', fontFamily:"'Zen Kaku Gothic New',sans-serif",
+  };
 
   if (activeChallenge) return (
     <div style={wrapper}>
       <ChallengeRunner challenge={activeChallenge} onComplete={handleComplete} onBack={() => setActiveChallenge(null)}/>
     </div>
   );
-
   if (showPicker) return (
     <div style={wrapper}>
       <ChallengePicker onSelect={ch => { setActiveChallenge(ch); setShowPicker(false); }} onBack={() => setShowPicker(false)}/>
@@ -935,10 +1317,10 @@ export default function Page() {
     <div style={wrapper}>
       {screen==='home'  && <HomeScreen onStart={setActiveChallenge} onPick={() => setShowPicker(true)} onGoBoard={() => setScreen('board')} todayDone={todayDone} streak={streak}/>}
       {screen==='board' && <BoardScreen/>}
-      {screen==='goals' && <StubScreen title="目標設定 🎯"/>}
-      {screen==='dash'  && <StubScreen title="成長の記録 📊"/>}
-      {screen==='notif' && <StubScreen title="通知 🔔"/>}
-      <BottomNav current={screen} onChange={setScreen} unread={2}/>
+      {screen==='goals' && <GoalsScreen/>}
+      {screen==='dash'  && <DashScreen streak={streak} history={history}/>}
+      {screen==='notif' && <NotifScreen/>}
+      <BottomNav current={screen} onChange={setScreen} unread={0}/>
     </div>
   );
 }
