@@ -1159,183 +1159,299 @@ function DashScreen({ streak, history }) {
 // ════════════════════════════════════════════════════════════
 // 通知設定画面
 // ════════════════════════════════════════════════════════════
-function NotifScreen() {
-  const [notifOn, setNotifOn]       = useState(true);
-  const [hour, setHour]             = useState(8);
-  const [minute, setMinute]         = useState(0);
-  const [saved, setSaved]           = useState(false);
-  const [isDirty, setIsDirty]       = useState(false);
-  // 保存済みの設定を別途保持して「現在の設定」表示に使う
-  const [savedSettings, setSavedSettings] = useState(null);
+function NotifScreen({ onBack }) {
+  // 通知ルール型: { id, type:'daily'|'weekday'|'weekend'|'custom', days:[], hour, minute, on }
+  const [rules, setRules]   = useState([]);
+  const [saved, setSaved]   = useState(false);
+  const [editing, setEditing] = useState(null); // 編集中ルールのid
+  const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
-    sget('notif-settings').then(v => {
-      if (v) {
-        setNotifOn(v.on);
-        setHour(v.hour);
-        setMinute(v.minute);
-        setSavedSettings(v);
-      } else {
-        // デフォルト値を「保存済み」として扱う
-        setSavedSettings({ on: true, hour: 8, minute: 0 });
-      }
+    sget('notif-rules').then(v => {
+      if (v && v.length) setRules(v);
+      else setRules([{ id:'default', type:'daily', days:[0,1,2,3,4,5,6], hour:8, minute:0, on:true }]);
     });
   }, []);
 
-  // 設定が変更されたら「未保存」フラグを立てる
-  useEffect(() => {
-    if (!savedSettings) return;
-    const changed = notifOn !== savedSettings.on ||
-                    hour    !== savedSettings.hour ||
-                    minute  !== savedSettings.minute;
-    setIsDirty(changed);
-  }, [notifOn, hour, minute, savedSettings]);
-
-  async function save() {
-    haptic('success');
-    const settings = { on: notifOn, hour, minute };
-    await sset('notif-settings', settings);
-    if (notifOn) {
-      scheduleNotification(hour, '🌱 今日のひとあし', `${hour}時です。今日の小さなチャレンジを始めませんか？`);
-    } else {
-      // ネイティブ側の通知もキャンセル
-      if (isNative && window.nativeApp?.cancelNotification) {
-        window.nativeApp.cancelNotification();
-      }
-    }
-    setSavedSettings(settings);
-    setIsDirty(false);
+  async function saveAll(newRules) {
+    const r = newRules ?? rules;
+    await sset('notif-rules', r);
+    // iOSへ全ルールを送信
+    r.filter(x => x.on).forEach(rule => {
+      rule.days.forEach(day => {
+        if (isNative && window.nativeApp?.scheduleNotificationForDay) {
+          window.nativeApp.scheduleNotificationForDay(day, rule.hour, rule.minute,
+            '🌱 今日のひとあし', `${rule.hour}時です。今日の小さなチャレンジを始めませんか？`);
+        } else {
+          scheduleNotification(rule.hour, '🌱 今日のひとあし', `${rule.hour}時です。今日の小さなチャレンジを始めませんか？`);
+        }
+      });
+    });
     setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    setTimeout(() => setSaved(false), 2000);
   }
 
-  const timeStr = `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
-  const savedTimeStr = savedSettings
-    ? `${String(savedSettings.hour).padStart(2,'0')}:${String(savedSettings.minute).padStart(2,'0')}`
-    : '08:00';
+  function toggleRule(id) {
+    const updated = rules.map(r => r.id === id ? {...r, on: !r.on} : r);
+    setRules(updated);
+    saveAll(updated);
+  }
+
+  function deleteRule(id) {
+    haptic('light');
+    const updated = rules.filter(r => r.id !== id);
+    setRules(updated);
+    saveAll(updated);
+  }
+
+  function addRule(rule) {
+    const newRule = { ...rule, id: Date.now().toString() };
+    const updated = [...rules, newRule];
+    setRules(updated);
+    setShowAdd(false);
+    saveAll(updated);
+  }
+
+  function updateRule(id, patch) {
+    const updated = rules.map(r => r.id === id ? {...r, ...patch} : r);
+    setRules(updated);
+    setEditing(null);
+    saveAll(updated);
+  }
+
+  const DAY_LABELS = ['日','月','火','水','木','金','土'];
+  const QUICK_TIMES = [[6,0,'早朝'],[7,0,'朝'],[8,0,'朝'],[12,0,'昼'],[18,0,'夕方'],[21,0,'夜']];
+
+  function ruleLabel(rule) {
+    const t = `${String(rule.hour).padStart(2,'0')}:${String(rule.minute).padStart(2,'0')}`;
+    if (rule.type === 'daily')   return `毎日 ${t}`;
+    if (rule.type === 'weekday') return `平日 ${t}`;
+    if (rule.type === 'weekend') return `休日 ${t}`;
+    return `${rule.days.map(d => DAY_LABELS[d]).join('・')} ${t}`;
+  }
 
   return (
-    <div style={{padding:'0 16px 100px'}}>
-      <div style={{padding:'52px 0 20px'}}>
-        <h2 style={{fontSize:22,fontWeight:900,color:T.ink}}>通知設定 🔔</h2>
-        <p style={{fontSize:13,color:T.inkL,marginTop:4}}>毎日のリマインダーを設定しよう</p>
-      </div>
-
-      {/* ── 現在の設定バナー ── */}
-      <div style={{
-        background: savedSettings?.on
-          ? `linear-gradient(135deg,${T.sage},${T.sageL})`
-          : T.sand,
-        borderRadius: 16,
-        padding: '14px 18px',
-        marginBottom: 16,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 14,
-      }}>
-        <span style={{fontSize: 28, flexShrink: 0}}>
-          {savedSettings?.on ? '🔔' : '🔕'}
-        </span>
-        <div style={{flex: 1}}>
-          <p style={{fontSize: 11, fontWeight: 700,
-            color: savedSettings?.on ? 'rgba(255,255,255,0.75)' : T.inkL,
-            letterSpacing: '0.08em', marginBottom: 2}}>
-            現在の設定
-          </p>
-          {savedSettings?.on ? (
-            <p style={{fontSize: 17, fontWeight: 900, color: '#fff', margin: 0}}>
-              毎日 {savedTimeStr} に通知
-            </p>
-          ) : (
-            <p style={{fontSize: 15, fontWeight: 700, color: T.inkM, margin: 0}}>
-              通知オフ
-            </p>
-          )}
-        </div>
-        {/* 未保存バッジ */}
-        {isDirty && (
-          <span style={{background:'rgba(255,255,255,0.25)',color: savedSettings?.on?'#fff':T.inkM,
-            fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:99,flexShrink:0}}>
-            未保存
-          </span>
+    <div style={{padding:'0 16px 120px'}}>
+      <div style={{padding:'52px 0 20px',display:'flex',alignItems:'center',gap:12}}>
+        {onBack && (
+          <button onClick={onBack}
+            style={{background:T.sageXL,border:'none',borderRadius:12,width:40,height:40,fontSize:18,cursor:'pointer',flexShrink:0}}>←</button>
         )}
+        <div>
+          <h2 style={{fontSize:22,fontWeight:900,color:T.ink}}>通知設定 🔔</h2>
+          <p style={{fontSize:13,color:T.inkL,marginTop:2}}>{rules.filter(r=>r.on).length}件のリマインダーが有効</p>
+        </div>
       </div>
 
-      {/* ── ON/OFF ── */}
-      <Card style={{marginBottom:12,padding:'18px 20px'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div>
-            <p style={{fontSize:15,fontWeight:700,color:T.ink,marginBottom:2}}>毎日リマインダー</p>
-            <p style={{fontSize:12,color:T.inkL}}>設定した時間にお知らせします</p>
-          </div>
-          <button onClick={() => { haptic('light'); setNotifOn(v => !v); }}
-            style={{width:50,height:28,borderRadius:99,background:notifOn?T.sage:T.border,border:'none',cursor:'pointer',position:'relative',transition:'all 0.2s'}}>
-            <div style={{width:22,height:22,borderRadius:'50%',background:T.white,position:'absolute',top:3,left:notifOn?25:3,transition:'all 0.2s',boxShadow:'0 1px 4px rgba(0,0,0,0.2)'}}/>
-          </button>
+      {/* ルール一覧 */}
+      <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:12}}>
+        {rules.map(rule => (
+          <Card key={rule.id} style={{padding:'14px 16px'}}>
+            {editing === rule.id ? (
+              <RuleEditor
+                rule={rule}
+                onSave={patch => updateRule(rule.id, patch)}
+                onCancel={() => setEditing(null)}
+                quickTimes={QUICK_TIMES}
+                dayLabels={DAY_LABELS}
+              />
+            ) : (
+              <div style={{display:'flex',alignItems:'center',gap:12}}>
+                <div style={{width:40,height:40,borderRadius:'50%',
+                  background: rule.on ? `linear-gradient(135deg,${T.sage},${T.sageL})` : T.sand,
+                  display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>
+                  {rule.on ? '🔔' : '🔕'}
+                </div>
+                <div style={{flex:1}}>
+                  <p style={{fontSize:15,fontWeight:700,color:rule.on?T.ink:T.inkL,marginBottom:2}}>{ruleLabel(rule)}</p>
+                  <p style={{fontSize:11,color:T.inkL}}>
+                    {rule.type==='daily'   ? '毎日' :
+                     rule.type==='weekday' ? '月〜金' :
+                     rule.type==='weekend' ? '土・日' :
+                     rule.days.map(d=>DAY_LABELS[d]).join('・')}
+                  </p>
+                </div>
+                {/* ON/OFF */}
+                <button onClick={() => toggleRule(rule.id)}
+                  style={{width:46,height:26,borderRadius:99,background:rule.on?T.sage:T.border,
+                    border:'none',cursor:'pointer',position:'relative',transition:'all 0.2s',flexShrink:0}}>
+                  <div style={{width:20,height:20,borderRadius:'50%',background:T.white,
+                    position:'absolute',top:3,left:rule.on?23:3,transition:'all 0.2s',
+                    boxShadow:'0 1px 4px rgba(0,0,0,0.2)'}}/>
+                </button>
+                {/* 編集 */}
+                <button onClick={() => setEditing(rule.id)}
+                  style={{background:T.sageXL,border:'none',borderRadius:8,
+                    padding:'6px 10px',fontSize:12,color:T.sage,cursor:'pointer',fontWeight:700,flexShrink:0}}>
+                  編集
+                </button>
+                {/* 削除 */}
+                {rules.length > 1 && (
+                  <button onClick={() => deleteRule(rule.id)}
+                    style={{background:T.roseL,border:'none',borderRadius:8,
+                      padding:'6px 10px',fontSize:12,color:T.rose,cursor:'pointer',fontWeight:700,flexShrink:0}}>
+                    削除
+                  </button>
+                )}
+              </div>
+            )}
+          </Card>
+        ))}
+      </div>
+
+      {/* 追加パネル */}
+      {showAdd ? (
+        <Card style={{padding:'16px',marginBottom:12}}>
+          <RuleEditor
+            rule={{type:'daily',days:[0,1,2,3,4,5,6],hour:8,minute:0,on:true}}
+            onSave={addRule}
+            onCancel={() => setShowAdd(false)}
+            quickTimes={QUICK_TIMES}
+            dayLabels={DAY_LABELS}
+            isNew
+          />
+        </Card>
+      ) : (
+        <button onClick={() => { haptic('light'); setShowAdd(true); }}
+          style={{width:'100%',padding:14,borderRadius:16,
+            border:`2px dashed ${T.border}`,background:'transparent',
+            color:T.sage,fontWeight:700,fontSize:15,cursor:'pointer',
+            fontFamily:'inherit',marginBottom:12}}>
+          ＋ 通知を追加する
+        </button>
+      )}
+
+      {saved && (
+        <div style={{textAlign:'center',padding:'10px',color:T.sage,fontWeight:700,fontSize:14}}>
+          ✅ 保存しました！
         </div>
-      </Card>
-
-      {/* ── 時刻設定 ── */}
-      {notifOn && (
-        <Card style={{marginBottom:12,padding:'20px'}}>
-          <p style={{fontSize:13,fontWeight:700,color:T.inkL,letterSpacing:'0.08em',marginBottom:16}}>通知時刻</p>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12,marginBottom:20}}>
-            {/* 時 */}
-            <div style={{textAlign:'center'}}>
-              <button onClick={() => setHour(h => (h+1)%24)} style={{display:'block',width:56,padding:'8px 0',background:T.sageXL,border:'none',borderRadius:10,fontSize:18,cursor:'pointer',marginBottom:6}}>▲</button>
-              <div style={{width:56,padding:'10px 0',background:T.white,border:`2px solid ${T.sage}`,borderRadius:12,fontSize:28,fontWeight:900,color:T.ink,textAlign:'center'}}>{String(hour).padStart(2,'0')}</div>
-              <button onClick={() => setHour(h => (h+23)%24)} style={{display:'block',width:56,padding:'8px 0',background:T.sageXL,border:'none',borderRadius:10,fontSize:18,cursor:'pointer',marginTop:6}}>▼</button>
-            </div>
-            <span style={{fontSize:32,fontWeight:900,color:T.ink,marginBottom:4}}>:</span>
-            {/* 分 */}
-            <div style={{textAlign:'center'}}>
-              <button onClick={() => setMinute(m => (m+15)%60)} style={{display:'block',width:56,padding:'8px 0',background:T.sageXL,border:'none',borderRadius:10,fontSize:18,cursor:'pointer',marginBottom:6}}>▲</button>
-              <div style={{width:56,padding:'10px 0',background:T.white,border:`2px solid ${T.sage}`,borderRadius:12,fontSize:28,fontWeight:900,color:T.ink,textAlign:'center'}}>{String(minute).padStart(2,'0')}</div>
-              <button onClick={() => setMinute(m => (m+45)%60)} style={{display:'block',width:56,padding:'8px 0',background:T.sageXL,border:'none',borderRadius:10,fontSize:18,cursor:'pointer',marginTop:6}}>▼</button>
-            </div>
-          </div>
-          {/* クイック選択 */}
-          <p style={{fontSize:12,color:T.inkL,marginBottom:10}}>よく使う時間</p>
-          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            {[[6,0,'早朝'],[7,0,'朝'],[8,0,'朝'],[12,0,'昼'],[18,0,'夕方'],[21,0,'夜']].map(([h,m,label]) => (
-              <button key={h} onClick={() => { setHour(h); setMinute(m); haptic('light'); }}
-                style={{padding:'6px 14px',borderRadius:99,border:`1.5px solid ${hour===h&&minute===m?T.sage:T.border}`,background:hour===h&&minute===m?T.sageXL:'transparent',fontSize:13,color:hour===h&&minute===m?T.sage:T.inkM,cursor:'pointer',fontFamily:'inherit',fontWeight:hour===h&&minute===m?700:400}}>
-                {String(h).padStart(2,'0')}:{String(m).padStart(2,'0')} {label}
-              </button>
-            ))}
-          </div>
-        </Card>
       )}
 
-      {/* ── 通知プレビュー ── */}
-      {notifOn && (
-        <Card style={{marginBottom:16,padding:'14px 18px',background:T.sageXL,border:'none'}}>
-          <p style={{fontSize:11,fontWeight:700,color:T.sage,marginBottom:6,letterSpacing:'0.08em'}}>
-            保存後の通知イメージ
-          </p>
-          <div style={{background:T.white,borderRadius:12,padding:'10px 14px',boxShadow:'0 2px 8px rgba(0,0,0,0.06)'}}>
-            <p style={{fontSize:12,color:T.inkL,marginBottom:2}}>{timeStr}</p>
-            <p style={{fontSize:13,fontWeight:700,color:T.ink,marginBottom:2}}>🌱 今日のひとあし</p>
-            <p style={{fontSize:12,color:T.inkM}}>{hour}時です。今日の小さなチャレンジを始めませんか？</p>
-          </div>
-        </Card>
-      )}
-
-      {/* ── 保存ボタン ── */}
-      <Btn onClick={save} variant={isDirty ? 'amber' : 'primary'} style={{width:'100%',padding:16,fontSize:16}}>
-        {saved   ? '✅ 保存しました！' :
-         isDirty ? '💾 変更を保存する' :
-                   '✅ 保存済み'}
-      </Btn>
-
-      {!notifOn && (
-        <p style={{fontSize:12,color:T.inkL,textAlign:'center',marginTop:12}}>
-          通知をオフにしても、アプリを開けばいつでもチャレンジできます
-        </p>
-      )}
+      <p style={{fontSize:12,color:T.inkL,textAlign:'center',marginTop:8}}>
+        通知をオフにしても、アプリを開けばいつでもチャレンジできます
+      </p>
     </div>
   );
 }
+
+// ── 通知ルール編集コンポーネント ──────────────────────────
+function RuleEditor({ rule: initial, onSave, onCancel, quickTimes, dayLabels, isNew }) {
+  const [type,   setType]   = useState(initial.type);
+  const [days,   setDays]   = useState(initial.days);
+  const [hour,   setHour]   = useState(initial.hour);
+  const [minute, setMinute] = useState(initial.minute);
+
+  const TYPES = [
+    { id:'daily',   label:'毎日',   icon:'📅' },
+    { id:'weekday', label:'平日',   icon:'💼' },
+    { id:'weekend', label:'休日',   icon:'🌿' },
+    { id:'custom',  label:'カスタム', icon:'✏️' },
+  ];
+
+  function handleTypeChange(t) {
+    setType(t);
+    if (t === 'daily')   setDays([0,1,2,3,4,5,6]);
+    if (t === 'weekday') setDays([1,2,3,4,5]);
+    if (t === 'weekend') setDays([0,6]);
+  }
+
+  function toggleDay(d) {
+    setDays(prev => prev.includes(d) ? prev.filter(x=>x!==d) : [...prev,d].sort());
+  }
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <p style={{fontSize:13,fontWeight:700,color:T.inkL,margin:0}}>{isNew ? '新しい通知を追加' : '通知を編集'}</p>
+
+      {/* タイプ選択 */}
+      <div style={{display:'flex',gap:6}}>
+        {TYPES.map(t => (
+          <button key={t.id} onClick={() => handleTypeChange(t.id)}
+            style={{flex:1,padding:'8px 4px',borderRadius:12,
+              border:`1.5px solid ${type===t.id?T.sage:T.border}`,
+              background:type===t.id?T.sageXL:'transparent',
+              color:type===t.id?T.sage:T.inkL,
+              fontWeight:type===t.id?700:400,fontSize:11,
+              cursor:'pointer',fontFamily:'inherit',textAlign:'center'}}>
+            <div style={{fontSize:16,marginBottom:2}}>{t.icon}</div>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* カスタム曜日選択 */}
+      {type === 'custom' && (
+        <div style={{display:'flex',gap:6,justifyContent:'center'}}>
+          {dayLabels.map((d,i) => (
+            <button key={i} onClick={() => toggleDay(i)}
+              style={{width:36,height:36,borderRadius:'50%',
+                border:`1.5px solid ${days.includes(i)?T.sage:T.border}`,
+                background:days.includes(i)?T.sage:'transparent',
+                color:days.includes(i)?T.white:T.inkL,
+                fontWeight:700,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
+              {d}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 時刻設定 */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+        <div style={{textAlign:'center'}}>
+          <button onClick={() => setHour(h=>(h+1)%24)}
+            style={{display:'block',width:50,padding:'6px 0',background:T.sageXL,border:'none',borderRadius:8,fontSize:16,cursor:'pointer',marginBottom:4}}>▲</button>
+          <div style={{width:50,padding:'8px 0',background:T.white,border:`2px solid ${T.sage}`,borderRadius:10,fontSize:24,fontWeight:900,color:T.ink,textAlign:'center'}}>
+            {String(hour).padStart(2,'0')}
+          </div>
+          <button onClick={() => setHour(h=>(h+23)%24)}
+            style={{display:'block',width:50,padding:'6px 0',background:T.sageXL,border:'none',borderRadius:8,fontSize:16,cursor:'pointer',marginTop:4}}>▼</button>
+        </div>
+        <span style={{fontSize:28,fontWeight:900,color:T.ink}}>:</span>
+        <div style={{textAlign:'center'}}>
+          <button onClick={() => setMinute(m=>(m+15)%60)}
+            style={{display:'block',width:50,padding:'6px 0',background:T.sageXL,border:'none',borderRadius:8,fontSize:16,cursor:'pointer',marginBottom:4}}>▲</button>
+          <div style={{width:50,padding:'8px 0',background:T.white,border:`2px solid ${T.sage}`,borderRadius:10,fontSize:24,fontWeight:900,color:T.ink,textAlign:'center'}}>
+            {String(minute).padStart(2,'0')}
+          </div>
+          <button onClick={() => setMinute(m=>(m+45)%60)}
+            style={{display:'block',width:50,padding:'6px 0',background:T.sageXL,border:'none',borderRadius:8,fontSize:16,cursor:'pointer',marginTop:4}}>▼</button>
+        </div>
+      </div>
+
+      {/* クイック選択 */}
+      <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+        {quickTimes.map(([h,m,label]) => (
+          <button key={h} onClick={() => { setHour(h); setMinute(m); }}
+            style={{padding:'5px 12px',borderRadius:99,fontFamily:'inherit',
+              border:`1.5px solid ${hour===h&&minute===m?T.sage:T.border}`,
+              background:hour===h&&minute===m?T.sageXL:'transparent',
+              color:hour===h&&minute===m?T.sage:T.inkM,
+              fontSize:12,cursor:'pointer',fontWeight:hour===h&&minute===m?700:400}}>
+            {String(h).padStart(2,'0')}:{String(m).padStart(2,'0')} {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ボタン */}
+      <div style={{display:'flex',gap:8}}>
+        <button onClick={onCancel}
+          style={{flex:1,padding:'10px 0',borderRadius:12,background:T.sand,
+            border:'none',color:T.inkM,fontWeight:700,fontSize:14,
+            cursor:'pointer',fontFamily:'inherit'}}>キャンセル</button>
+        <button onClick={() => {
+            if (type==='custom' && days.length===0) return;
+            onSave({type,days,hour,minute,on:true});
+          }}
+          style={{flex:1,padding:'10px 0',borderRadius:12,background:T.sage,
+            border:'none',color:T.white,fontWeight:700,fontSize:14,
+            cursor:'pointer',fontFamily:'inherit'}}>
+          {isNew ? '追加する' : '保存する'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 
 // ════════════════════════════════════════════════════════════
 // オンボーディング
@@ -1536,10 +1652,17 @@ function CelebrationEffect({ challenge, streak, onClose }) {
 // ════════════════════════════════════════════════════════════
 // プロフィール・設定画面
 // ════════════════════════════════════════════════════════════
-function ProfileScreen({ userName, streak, onNameChange }) {
-  const [editing, setEditing] = useState(false);
-  const [nameInput, setNameInput] = useState(userName);
+function ProfileScreen({ userName, streak, onNameChange, onGoNotif }) {
+  const [editing, setEditing]           = useState(false);
+  const [nameInput, setNameInput]       = useState(userName);
   const [resetConfirm, setResetConfirm] = useState(false);
+  const [notifSettings, setNotifSettings] = useState(null);
+
+  useEffect(() => {
+    sget('notif-settings').then(v => {
+      setNotifSettings(v || { on: true, hour: 8, minute: 0 });
+    });
+  }, []);
 
   async function saveName() {
     haptic('light');
@@ -1561,32 +1684,92 @@ function ProfileScreen({ userName, streak, onNameChange }) {
   const joinDate = new Date();
   joinDate.setDate(joinDate.getDate() - streak);
 
+  const notifTimeStr = notifSettings
+    ? `${String(notifSettings.hour).padStart(2,'0')}:${String(notifSettings.minute).padStart(2,'0')}`
+    : '08:00';
+
+  // notifSettingsがnullの間はデフォルト値で表示
+  const notifOn      = notifSettings?.on ?? true;
+  const notifDisplay = notifOn
+    ? `毎日 ${notifTimeStr} に通知`
+    : '通知オフ';
+
   return (
-    <div style={{padding:'0 16px 100px'}}>
+    <div style={{padding:'0 16px 100px',position:'relative'}}>
+
+      {/* ── 編集中オーバーレイ：背景を操作不能にする ── */}
+      {editing && (
+        <div
+          onClick={() => setEditing(false)}
+          style={{position:'fixed',inset:0,zIndex:50,background:'rgba(0,0,0,0.35)',backdropFilter:'blur(2px)'}}
+        />
+      )}
+
       <div style={{padding:'52px 0 20px'}}>
         <h2 style={{fontSize:22,fontWeight:900,color:T.ink}}>プロフィール 👤</h2>
       </div>
 
       {/* アバター＋名前 */}
-      <div style={{textAlign:'center',marginBottom:24}}>
+      <div style={{textAlign:'center',marginBottom:24,position:'relative',zIndex:editing?60:1}}>
         <div style={{width:88,height:88,borderRadius:'50%',background:`linear-gradient(135deg,${T.sage},${T.sageL})`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:40,margin:'0 auto 12px',boxShadow:`0 6px 24px ${T.sage}44`}}>
           🌱
         </div>
         {editing ? (
-          <div style={{display:'flex',gap:8,alignItems:'center',justifyContent:'center'}}>
-            <input value={nameInput} onChange={e => setNameInput(e.target.value)}
-              style={{padding:'8px 14px',borderRadius:12,border:`1.5px solid ${T.sage}`,fontSize:16,fontFamily:'inherit',textAlign:'center',width:160,color:T.ink,background:T.cream}}
+          <div style={{background:T.white,borderRadius:20,padding:'20px',boxShadow:'0 8px 32px rgba(0,0,0,0.18)',display:'inline-flex',flexDirection:'column',alignItems:'center',gap:12,minWidth:240}}>
+            <p style={{fontSize:13,fontWeight:700,color:T.inkL,margin:0}}>ニックネームを編集</p>
+            <input
+              value={nameInput}
+              onChange={e => setNameInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
+              style={{padding:'10px 14px',borderRadius:12,border:`2px solid ${T.sage}`,fontSize:16,fontFamily:'inherit',textAlign:'center',width:'100%',color:T.ink,background:T.cream}}
               autoFocus/>
-            <button onClick={saveName} style={{padding:'8px 14px',borderRadius:12,background:T.sage,border:'none',color:T.white,fontWeight:700,fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>保存</button>
+            <div style={{display:'flex',gap:8,width:'100%'}}>
+              <button onClick={() => setEditing(false)}
+                style={{flex:1,padding:'10px 0',borderRadius:12,background:T.sand,border:'none',color:T.inkM,fontWeight:700,fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>
+                キャンセル
+              </button>
+              <button onClick={saveName}
+                style={{flex:1,padding:'10px 0',borderRadius:12,background:T.sage,border:'none',color:T.white,fontWeight:700,fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>
+                保存
+              </button>
+            </div>
           </div>
         ) : (
           <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
             <p style={{fontSize:22,fontWeight:900,color:T.ink}}>{userName}</p>
-            <button onClick={() => setEditing(true)} style={{background:T.sageXL,border:'none',borderRadius:8,padding:'4px 8px',fontSize:12,color:T.sage,cursor:'pointer',fontWeight:700}}>編集</button>
+            <button onClick={() => { setNameInput(userName); setEditing(true); }}
+              style={{background:T.sageXL,border:'none',borderRadius:8,padding:'4px 8px',fontSize:12,color:T.sage,cursor:'pointer',fontWeight:700}}>
+              編集
+            </button>
           </div>
         )}
-        <p style={{fontSize:12,color:T.inkL,marginTop:4}}>{streak}日目のひとあし旅</p>
+        <p style={{fontSize:12,color:T.inkL,marginTop:editing?12:4}}>{streak}日目のひとあし旅</p>
       </div>
+
+      {/* 通知設定サマリー */}
+      <Card style={{marginBottom:12,padding:'16px 18px'}}>
+        <p style={{fontSize:12,fontWeight:700,color:T.inkL,letterSpacing:'0.1em',marginBottom:10}}>通知設定</p>
+        <div style={{display:'flex',alignItems:'center',gap:14}}>
+          <div style={{width:44,height:44,borderRadius:'50%',
+            background: notifOn ? `linear-gradient(135deg,${T.sage},${T.sageL})` : T.sand,
+            display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>
+            {notifOn ? '🔔' : '🔕'}
+          </div>
+          <div style={{flex:1}}>
+            <p style={{fontSize:15,fontWeight:700,color:T.ink,marginBottom:2}}>{notifDisplay}</p>
+            <p style={{fontSize:12,color: notifOn ? T.sage : T.inkL}}>
+              {notifOn ? 'リマインダーON ✅' : '現在オフです'}
+            </p>
+          </div>
+        </div>
+        <button onClick={onGoNotif}
+          style={{width:'100%',marginTop:12,padding:'10px 0',borderRadius:12,
+            border:`1.5px solid ${T.border}`,background:T.sageXL,
+            color:T.sage,fontWeight:700,fontSize:14,
+            cursor:'pointer',fontFamily:'inherit'}}>
+          🔔 通知設定を変更する →
+        </button>
+      </Card>
 
       {/* 実績バッジ */}
       <Card style={{padding:'18px 20px',marginBottom:12}}>
@@ -1880,7 +2063,8 @@ export default function Page() {
       {screen==='board'   && <BoardScreen/>}
       {screen==='goals'   && <GoalsScreen/>}
       {screen==='history' && <HistoryScreen history={history}/>}
-      {screen==='profile' && <ProfileScreen userName={userName} streak={streak} onNameChange={setUserName}/>}
+      {screen==='notif'   && <NotifScreen onBack={() => setScreen('profile')}/>}
+      {screen==='profile' && <ProfileScreen userName={userName} streak={streak} onNameChange={setUserName} onGoNotif={() => setScreen('notif')}/>}
       <BottomNavNew current={screen} onChange={setScreen}/>
     </div>
   );
