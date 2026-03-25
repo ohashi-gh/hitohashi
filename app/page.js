@@ -25,15 +25,17 @@ function scheduleNotification(hour, title, body) {
 
 // ── デザイントークン ──────────────────────────────────────
 const T = {
-  sage:'#4a7c59', sageL:'#6a9e78', sageXL:'#e8f4ec',
-  cream:'#faf7f2', sand:'#f0ead8',
-  amber:'#e8a838', amberL:'#fdf0d5',
+  sage:'#4a7c59', sageL:'#6a9e78', sageXL:'#edf5ef',
+  cream:'#f8f7f4', sand:'#f0ead8',
+  amber:'#e8a838', amberL:'#fdf3d8',
   rose:'#d4756b',  roseL:'#fbeae8',
-  ink:'#1e2a20',   inkM:'#4a5e4d',  inkL:'#8a9e8d',
-  white:'#ffffff', border:'#e2ddd4',
+  ink:'#1a2420',   inkM:'#4a5e4d',  inkL:'#94a89a',
+  white:'#ffffff', border:'#e4e0d8',
   purple:'#7c6dc9',purpleL:'#ede9fe',
   blue:'#4a90d9',  blueL:'#dbeafe',
   teal:'#2d9596',  tealL:'#ccf2f1',
+  // フラットUI用
+  r:8, // 基本角丸
 };
 
 // ── ストレージ ────────────────────────────────────────────
@@ -376,21 +378,21 @@ const CHALLENGES = [
 // 共通UIコンポーネント
 // ════════════════════════════════════════════════════════════
 function Btn({ children, onClick, variant='primary', style:sx={}, disabled }) {
-  const base = { border:'none', borderRadius:16, padding:'14px 20px', fontSize:16, fontWeight:700,
-    cursor:disabled?'not-allowed':'pointer', fontFamily:'inherit', transition:'all 0.18s', opacity:disabled?0.5:1, ...sx };
+  const base = { border:'none', borderRadius:8, padding:'13px 20px', fontSize:15, fontWeight:700,
+    cursor:disabled?'not-allowed':'pointer', fontFamily:'inherit', transition:'opacity 0.15s', opacity:disabled?0.4:1, ...sx };
   const v = {
-    primary: { background:`linear-gradient(135deg,${T.sage},${T.sageL})`, color:T.white, boxShadow:`0 4px 20px ${T.sage}55` },
-    ghost:   { background:'transparent', color:T.inkM, border:`1.5px solid ${T.border}` },
-    amber:   { background:`linear-gradient(135deg,${T.amber},#f0bc60)`, color:T.white, boxShadow:`0 4px 20px ${T.amber}55` },
-    white:   { background:T.white, color:T.ink, boxShadow:'0 2px 12px rgba(0,0,0,0.1)' },
+    primary: { background:T.sage, color:T.white },
+    ghost:   { background:'transparent', color:T.inkM, border:`1px solid ${T.border}` },
+    amber:   { background:T.amber, color:T.white },
+    white:   { background:T.white, color:T.ink, border:`1px solid ${T.border}` },
   };
   return <button style={{...base,...v[variant]}} onClick={onClick} disabled={disabled}>{children}</button>;
 }
 
 function Card({ children, style:sx={}, onClick }) {
   return (
-    <div onClick={onClick} style={{ background:T.white, borderRadius:20, boxShadow:'0 2px 16px rgba(30,42,32,0.07)',
-      border:`1px solid ${T.border}`, overflow:'hidden', cursor:onClick?'pointer':'default', ...sx }}>
+    <div onClick={onClick} style={{ background:T.white, borderRadius:10, border:`1px solid ${T.border}`,
+      overflow:'hidden', cursor:onClick?'pointer':'default', ...sx }}>
       {children}
     </div>
   );
@@ -502,7 +504,7 @@ function ChallengeRunner({ challenge, onComplete, onBack }) {
   }
 
   return (
-    <div style={{minHeight:'100vh',background:`linear-gradient(160deg,${challenge.colorL},${T.cream} 60%)`,display:'flex',flexDirection:'column',maxWidth:430,margin:'0 auto'}}>
+    <div style={{minHeight:'100vh',background:T.sageXL,display:'flex',flexDirection:'column',maxWidth:430,margin:'0 auto'}}>
       {/* Header */}
       <div style={{padding:'52px 20px 12px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <button onClick={() => { stopSpeak(); haptic('light'); onBack(); }}
@@ -587,10 +589,10 @@ function ChallengeRunner({ challenge, onComplete, onBack }) {
               <p style={{fontSize:16,color:T.inkM,lineHeight:1.8,fontFamily:"'Noto Serif JP',serif",margin:0}}>{step.d}</p>
             </Card>
             <div style={{display:'flex',gap:10}}>
-              <button onClick={togglePause} style={{flex:1,padding:14,borderRadius:16,fontSize:17,border:`2px solid ${T.border}`,background:T.white,cursor:'pointer',fontWeight:700,color:T.inkM}}>
+              <button onClick={togglePause} style={{flex:1,padding:14,borderRadius:8,fontSize:17,border:`2px solid ${T.border}`,background:T.white,cursor:'pointer',fontWeight:700,color:T.inkM}}>
                 {paused ? '▶️ 再開' : '⏸️ 一時停止'}
               </button>
-              <button onClick={skipStep} style={{padding:'14px 18px',borderRadius:16,fontSize:14,border:`2px solid ${T.border}`,background:T.white,cursor:'pointer',color:T.inkL}}>スキップ →</button>
+              <button onClick={skipStep} style={{padding:'14px 18px',borderRadius:8,fontSize:14,border:`2px solid ${T.border}`,background:T.white,cursor:'pointer',color:T.inkL}}>スキップ →</button>
             </div>
           </div>
         )}
@@ -603,7 +605,7 @@ function ChallengeRunner({ challenge, onComplete, onBack }) {
               <h2 style={{fontSize:28,fontWeight:900,color:T.ink,margin:'14px 0 8px'}}>完了！</h2>
               <p style={{fontSize:16,color:T.inkM,fontFamily:"'Noto Serif JP',serif",lineHeight:1.7}}>{challenge.title}を<br/>やり遂げました。</p>
             </div>
-            <div style={{background:challenge.colorL,borderRadius:20,padding:'14px 28px',textAlign:'center'}}>
+            <div style={{background:challenge.colorL,borderRadius:10,padding:'14px 28px',textAlign:'center'}}>
               <p style={{fontSize:12,color:challenge.color,fontWeight:700,margin:'0 0 2px'}}>消費時間</p>
               <p style={{fontSize:24,fontWeight:900,color:challenge.color,margin:0}}>{challenge.mins}分</p>
             </div>
@@ -694,7 +696,7 @@ function HomeScreen({ onStart, onPick, onGoBoard, todayDone, streak }) {
       </div>
 
       {/* Today's CTA */}
-      <div style={{background:`linear-gradient(135deg,${tc.color},${tc.color}99)`,borderRadius:24,padding:'22px 22px 18px',marginBottom:16,boxShadow:`0 8px 32px ${tc.color}44`}}>
+      <div style={{background:`linear-gradient(135deg,${tc.color},${tc.color}99)`,borderRadius:12,padding:'22px 22px 18px',marginBottom:16}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14}}>
           <div style={{flex:1}}>
             <span style={{fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.8)',letterSpacing:'0.12em'}}>TODAY</span>
@@ -705,16 +707,16 @@ function HomeScreen({ onStart, onPick, onGoBoard, todayDone, streak }) {
         </div>
         <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
           {[tc.diff,`⏱ ${tc.mins}分`,`${tc.steps.length}ステップ`,'🔊 音声ガイド付き'].map(t =>
-            <span key={t} style={{fontSize:11,background:'rgba(255,255,255,0.25)',color:T.white,padding:'4px 10px',borderRadius:99,fontWeight:600}}>{t}</span>
+            <span key={t} style={{fontSize:11,background:'rgba(255,255,255,0.25)',color:T.white,padding:'4px 10px',borderRadius:99,fontWeight:700}}>{t}</span>
           )}
         </div>
         {!todayDone ? (
           <button onClick={() => { haptic('medium'); onStart(tc); }}
-            style={{width:'100%',padding:16,borderRadius:16,background:T.white,border:'none',fontSize:16,fontWeight:900,color:tc.color,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8,boxShadow:'0 4px 16px rgba(0,0,0,0.15)'}}>
+            style={{width:'100%',padding:16,borderRadius:8,background:T.white,border:'none',fontSize:16,fontWeight:900,color:tc.color,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
             <span style={{fontSize:20}}>▶️</span> 今すぐはじめる（3秒後スタート）
           </button>
         ) : (
-          <div style={{background:'rgba(255,255,255,0.25)',borderRadius:16,padding:'14px 20px',textAlign:'center'}}>
+          <div style={{background:'rgba(255,255,255,0.25)',borderRadius:8,padding:'14px 20px',textAlign:'center'}}>
             <span style={{fontSize:16,fontWeight:700,color:T.white}}>🌱 今日は完了！お疲れさまでした</span>
           </div>
         )}
@@ -728,7 +730,7 @@ function HomeScreen({ onStart, onPick, onGoBoard, todayDone, streak }) {
       <div style={{display:'flex',gap:10,overflowX:'auto',paddingBottom:8,marginBottom:16}}>
         {CHALLENGES.filter(c => c.id !== tc.id).slice(0,5).map(ch => (
           <button key={ch.id} onClick={() => { haptic('light'); onStart(ch); }}
-            style={{flexShrink:0,width:130,padding:14,borderRadius:18,background:T.white,border:`1px solid ${T.border}`,cursor:'pointer',textAlign:'left',boxShadow:'0 2px 12px rgba(0,0,0,0.05)'}}>
+            style={{flexShrink:0,width:130,padding:14,borderRadius:18,background:T.white,border:`1px solid ${T.border}`,cursor:'pointer',textAlign:'left'}}>
             <span style={{fontSize:30,display:'block',marginBottom:6}}>{ch.icon}</span>
             <p style={{fontSize:13,fontWeight:700,color:T.ink,margin:'0 0 2px',lineHeight:1.3}}>{ch.title}</p>
             <span style={{fontSize:11,color:ch.color,fontWeight:700}}>{ch.mins}分</span>
@@ -815,7 +817,7 @@ function BoardScreen() {
           <textarea ref={taRef} value={text} onChange={e => setText(e.target.value)}
             onFocus={() => setFocused(true)} onBlur={() => setTimeout(() => setFocused(false), 200)}
             placeholder="タップするとAIが候補を提案…" rows={focused?3:2}
-            style={{width:'100%',border:`1.5px solid ${focused?T.sage:T.border}`,borderRadius:12,padding:'12px 14px',fontSize:14,fontFamily:"'Noto Serif JP',serif",resize:'none',color:T.inkM,background:T.cream,lineHeight:1.7,transition:'all 0.2s',boxShadow:focused?`0 0 0 3px ${T.sageXL}`:'none'}}/>
+            style={{width:'100%',border:`1px solid ${focused?T.sage:T.border}`,borderRadius:12,padding:'12px 14px',fontSize:14,fontFamily:"'Noto Serif JP',serif",resize:'none',color:T.inkM,background:T.cream,lineHeight:1.7,transition:'all 0.2s',boxShadow:focused?`0 0 0 3px ${T.sageXL}`:'none'}}/>
           {!focused && <div style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',background:T.sageXL,color:T.sage,fontSize:11,fontWeight:700,padding:'3px 8px',borderRadius:99,pointerEvents:'none'}}>AI ✨</div>}
         </div>
         {focused && (
@@ -825,7 +827,7 @@ function BoardScreen() {
             )}
             {!sugLoading && sugs.map((s,i) =>
               <button key={i} onClick={() => { setText(s); taRef.current?.focus(); }}
-                style={{width:'100%',textAlign:'left',padding:'10px 14px',borderRadius:12,border:`1.5px solid ${T.sageXL}`,background:T.cream,cursor:'pointer',fontFamily:'inherit',marginBottom:8,fontSize:13,color:T.inkM,lineHeight:1.6}}>
+                style={{width:'100%',textAlign:'left',padding:'10px 14px',borderRadius:12,border:`1px solid ${T.sageXL}`,background:T.cream,cursor:'pointer',fontFamily:'inherit',marginBottom:8,fontSize:13,color:T.inkM,lineHeight:1.6}}>
                 {['🌿','☀️','🌙'][i]} {s}
               </button>
             )}
@@ -1004,7 +1006,7 @@ function GoalsScreen() {
       {/* AIアドバイス */}
       {goals.length > 0 && (
         <button onClick={getAiTip} disabled={tipLoading}
-          style={{width:'100%',padding:'12px 16px',borderRadius:14,border:`1.5px dashed ${T.sage}`,background:'transparent',cursor:'pointer',marginBottom:12,fontFamily:'inherit',color:T.sage,fontWeight:700,fontSize:14}}>
+          style={{width:'100%',padding:'12px 16px',borderRadius:8,border:`1.5px dashed ${T.sage}`,background:'transparent',cursor:'pointer',marginBottom:12,fontFamily:'inherit',color:T.sage,fontWeight:700,fontSize:14}}>
           {tipLoading ? '考え中...' : '✨ AIにアドバイスをもらう'}
         </button>
       )}
@@ -1017,7 +1019,7 @@ function GoalsScreen() {
       {/* 目標追加 */}
       {!adding ? (
         <button onClick={() => { haptic('light'); setAdding(true); }}
-          style={{width:'100%',padding:16,borderRadius:16,border:`2px dashed ${T.border}`,background:'transparent',cursor:'pointer',fontSize:15,color:T.inkM,fontFamily:'inherit',fontWeight:700}}>
+          style={{width:'100%',padding:16,borderRadius:8,border:`2px dashed ${T.border}`,background:'transparent',cursor:'pointer',fontSize:15,color:T.inkM,fontFamily:'inherit',fontWeight:700}}>
           ＋ 目標を追加する
         </button>
       ) : (
@@ -1026,7 +1028,7 @@ function GoalsScreen() {
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16}}>
             {GOAL_TEMPLATES.map(t => (
               <button key={t.id} onClick={() => setSelectedTemplate(t)}
-                style={{padding:'12px 10px',borderRadius:14,border:`2px solid ${selectedTemplate?.id===t.id?T.sage:T.border}`,background:selectedTemplate?.id===t.id?T.sageXL:'transparent',cursor:'pointer',textAlign:'left',fontFamily:'inherit',transition:'all 0.15s'}}>
+                style={{padding:'12px 10px',borderRadius:8,border:`2px solid ${selectedTemplate?.id===t.id?T.sage:T.border}`,background:selectedTemplate?.id===t.id?T.sageXL:'transparent',cursor:'pointer',textAlign:'left',fontFamily:'inherit',transition:'all 0.15s'}}>
                 <span style={{fontSize:22,display:'block',marginBottom:4}}>{t.icon}</span>
                 <p style={{fontSize:13,fontWeight:700,color:T.ink,margin:'0 0 2px'}}>{t.label}</p>
                 <p style={{fontSize:11,color:T.inkL,margin:0,lineHeight:1.4}}>{t.desc}</p>
@@ -1036,7 +1038,7 @@ function GoalsScreen() {
           {selectedTemplate?.id === 'custom' && (
             <input value={customText} onChange={e => setCustomText(e.target.value)}
               placeholder="目標を入力（例：毎日水を2L飲む）"
-              style={{width:'100%',padding:'10px 14px',borderRadius:12,border:`1.5px solid ${T.border}`,fontSize:14,fontFamily:'inherit',color:T.ink,background:T.cream,marginBottom:12}}/>
+              style={{width:'100%',padding:'10px 14px',borderRadius:12,border:`1px solid ${T.border}`,fontSize:14,fontFamily:'inherit',color:T.ink,background:T.cream,marginBottom:12}}/>
           )}
           <div style={{marginBottom:14}}>
             <p style={{fontSize:13,color:T.inkM,marginBottom:8}}>週に何回やる？</p>
@@ -1092,7 +1094,7 @@ function DashScreen({ streak, history }) {
       </div>
 
       {/* ストリーク大表示 */}
-      <div style={{background:`linear-gradient(135deg,${T.amber},#f0bc60)`,borderRadius:24,padding:'24px 24px 20px',marginBottom:16,boxShadow:`0 8px 32px ${T.amber}44`,textAlign:'center'}}>
+      <div style={{background:T.amber,borderRadius:12,padding:'24px 24px 20px',marginBottom:16,textAlign:'center'}}>
         <p style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.8)',letterSpacing:'0.12em',marginBottom:8}}>現在の連続記録</p>
         <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12}}>
           <span style={{fontSize:56}}>🔥</span>
@@ -1176,17 +1178,25 @@ function NotifScreen({ onBack }) {
   async function saveAll(newRules) {
     const r = newRules ?? rules;
     await sset('notif-rules', r);
-    // iOSへ全ルールを送信
-    r.filter(x => x.on).forEach(rule => {
-      rule.days.forEach(day => {
-        if (isNative && window.nativeApp?.scheduleNotificationForDay) {
-          window.nativeApp.scheduleNotificationForDay(day, rule.hour, rule.minute,
-            '🌱 今日のひとあし', `${rule.hour}時です。今日の小さなチャレンジを始めませんか？`);
-        } else {
-          scheduleNotification(rule.hour, '🌱 今日のひとあし', `${rule.hour}時です。今日の小さなチャレンジを始めませんか？`);
-        }
+    if (!isNative) { setSaved(true); setTimeout(() => setSaved(false), 2000); return; }
+    // 1. まず全通知をキャンセル
+    if (window.nativeApp?.cancelAllNotifications) {
+      window.nativeApp.cancelAllNotifications();
+    }
+    // 2. 少し待ってから再登録（キャンセル完了を待つ）
+    setTimeout(() => {
+      r.filter(x => x.on).forEach(rule => {
+        rule.days.forEach(day => {
+          if (window.nativeApp?.scheduleNotificationForDay) {
+            window.nativeApp.scheduleNotificationForDay(
+              day, rule.hour, rule.minute,
+              '🌱 今日のひとあし',
+              `${String(rule.hour).padStart(2,'0')}:${String(rule.minute).padStart(2,'0')} です。今日の小さなチャレンジを始めませんか？`
+            );
+          }
+        });
       });
-    });
+    }, 300);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -1276,8 +1286,7 @@ function NotifScreen({ onBack }) {
                   style={{width:46,height:26,borderRadius:99,background:rule.on?T.sage:T.border,
                     border:'none',cursor:'pointer',position:'relative',transition:'all 0.2s',flexShrink:0}}>
                   <div style={{width:20,height:20,borderRadius:'50%',background:T.white,
-                    position:'absolute',top:3,left:rule.on?23:3,transition:'all 0.2s',
-                    boxShadow:'0 1px 4px rgba(0,0,0,0.2)'}}/>
+                    position:'absolute',top:3,left:rule.on?23:3,transition:'all 0.2s'}}/>
                 </button>
                 {/* 編集 */}
                 <button onClick={() => setEditing(rule.id)}
@@ -1313,7 +1322,7 @@ function NotifScreen({ onBack }) {
         </Card>
       ) : (
         <button onClick={() => { haptic('light'); setShowAdd(true); }}
-          style={{width:'100%',padding:14,borderRadius:16,
+          style={{width:'100%',padding:14,borderRadius:8,
             border:`2px dashed ${T.border}`,background:'transparent',
             color:T.sage,fontWeight:700,fontSize:15,cursor:'pointer',
             fontFamily:'inherit',marginBottom:12}}>
@@ -1368,7 +1377,7 @@ function RuleEditor({ rule: initial, onSave, onCancel, quickTimes, dayLabels, is
         {TYPES.map(t => (
           <button key={t.id} onClick={() => handleTypeChange(t.id)}
             style={{flex:1,padding:'8px 4px',borderRadius:12,
-              border:`1.5px solid ${type===t.id?T.sage:T.border}`,
+              border:`1px solid ${type===t.id?T.sage:T.border}`,
               background:type===t.id?T.sageXL:'transparent',
               color:type===t.id?T.sage:T.inkL,
               fontWeight:type===t.id?700:400,fontSize:11,
@@ -1385,7 +1394,7 @@ function RuleEditor({ rule: initial, onSave, onCancel, quickTimes, dayLabels, is
           {dayLabels.map((d,i) => (
             <button key={i} onClick={() => toggleDay(i)}
               style={{width:36,height:36,borderRadius:'50%',
-                border:`1.5px solid ${days.includes(i)?T.sage:T.border}`,
+                border:`1px solid ${days.includes(i)?T.sage:T.border}`,
                 background:days.includes(i)?T.sage:'transparent',
                 color:days.includes(i)?T.white:T.inkL,
                 fontWeight:700,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
@@ -1423,7 +1432,7 @@ function RuleEditor({ rule: initial, onSave, onCancel, quickTimes, dayLabels, is
         {quickTimes.map(([h,m,label]) => (
           <button key={h} onClick={() => { setHour(h); setMinute(m); }}
             style={{padding:'5px 12px',borderRadius:99,fontFamily:'inherit',
-              border:`1.5px solid ${hour===h&&minute===m?T.sage:T.border}`,
+              border:`1px solid ${hour===h&&minute===m?T.sage:T.border}`,
               background:hour===h&&minute===m?T.sageXL:'transparent',
               color:hour===h&&minute===m?T.sage:T.inkM,
               fontSize:12,cursor:'pointer',fontWeight:hour===h&&minute===m?700:400}}>
@@ -1521,7 +1530,7 @@ function OnboardingScreen({ onFinish }) {
 
       {/* 最終スライド：設定 */}
       {isLast && (
-        <div style={{flex:1,background:`linear-gradient(160deg,${T.sageXL},${T.cream})`,display:'flex',flexDirection:'column',padding:'52px 24px 32px',animation:'fadeUp 0.4s ease'}}>
+        <div style={{flex:1,background:T.sageXL,display:'flex',flexDirection:'column',padding:'52px 24px 32px',animation:'fadeUp 0.4s ease'}}>
           <div style={{textAlign:'center',marginBottom:32}}>
             <div style={{fontSize:64,marginBottom:16}}>👋</div>
             <h1 style={{fontSize:24,fontWeight:900,color:T.ink,marginBottom:8}}>はじめましょう！</h1>
@@ -1532,7 +1541,7 @@ function OnboardingScreen({ onFinish }) {
             <p style={{fontSize:13,fontWeight:700,color:T.inkL,marginBottom:10,letterSpacing:'0.06em'}}>あなたのニックネーム（任意）</p>
             <input value={name} onChange={e => setName(e.target.value)}
               placeholder="例：さくら、たろう、匿名さん…"
-              style={{width:'100%',padding:'12px 14px',borderRadius:12,border:`1.5px solid ${T.border}`,fontSize:15,fontFamily:'inherit',color:T.ink,background:T.cream}}/>
+              style={{width:'100%',padding:'12px 14px',borderRadius:12,border:`1px solid ${T.border}`,fontSize:15,fontFamily:'inherit',color:T.ink,background:T.cream}}/>
           </Card>
           {/* 通知 */}
           <Card style={{padding:'16px 20px',marginBottom:24}}>
@@ -1543,7 +1552,7 @@ function OnboardingScreen({ onFinish }) {
               </div>
               <button onClick={() => setNotif(v => !v)}
                 style={{width:50,height:28,borderRadius:99,background:notif?T.sage:T.border,border:'none',cursor:'pointer',position:'relative',transition:'all 0.2s'}}>
-                <div style={{width:22,height:22,borderRadius:'50%',background:T.white,position:'absolute',top:3,left:notif?25:3,transition:'all 0.2s',boxShadow:'0 1px 4px rgba(0,0,0,0.2)'}}/>
+                <div style={{width:22,height:22,borderRadius:'50%',background:T.white,position:'absolute',top:3,left:notif?25:3,transition:'all 0.2s'}}/>
               </button>
             </div>
           </Card>
@@ -1618,13 +1627,13 @@ function CelebrationEffect({ challenge, streak, onClose }) {
       ))}
 
       {/* メインカード */}
-      <div style={{background:T.white,borderRadius:28,padding:'36px 32px',textAlign:'center',maxWidth:320,width:'calc(100% - 48px)',boxShadow:'0 20px 60px rgba(0,0,0,0.25)',animation:'countPop 0.5s ease',position:'relative',zIndex:1}}>
+      <div style={{background:T.white,borderRadius:12,padding:'36px 32px',textAlign:'center',maxWidth:320,width:'calc(100% - 48px)',animation:'countPop 0.5s ease',position:'relative',zIndex:1}}>
         <div style={{fontSize:72,marginBottom:8,animation:'float 2s ease-in-out infinite'}}>{challenge.icon}</div>
         <h2 style={{fontSize:26,fontWeight:900,color:T.ink,marginBottom:6}}>完了！✨</h2>
         <p style={{fontSize:16,color:T.inkM,marginBottom:20,fontFamily:"'Noto Serif JP',serif",lineHeight:1.7}}>{challenge.title}を<br/>やり遂げました。</p>
 
         {/* ストリーク */}
-        <div style={{background:`linear-gradient(135deg,${T.amber},#f0bc60)`,borderRadius:16,padding:'12px 20px',marginBottom:20,display:'inline-flex',alignItems:'center',gap:10}}>
+        <div style={{background:T.amber,borderRadius:8,padding:'12px 20px',marginBottom:20,display:'inline-flex',alignItems:'center',gap:10}}>
           <span style={{fontSize:28}}>🔥</span>
           <div style={{textAlign:'left'}}>
             <p style={{fontSize:11,color:'rgba(255,255,255,0.8)',margin:0}}>連続記録</p>
@@ -1641,7 +1650,7 @@ function CelebrationEffect({ challenge, streak, onClose }) {
         </p>
 
         <button onClick={onClose}
-          style={{width:'100%',padding:14,borderRadius:16,background:`linear-gradient(135deg,${T.sage},${T.sageL})`,border:'none',fontSize:16,fontWeight:700,color:T.white,cursor:'pointer',boxShadow:`0 4px 20px ${T.sage}55`}}>
+          style={{width:'100%',padding:14,borderRadius:8,background:T.sage,border:'none',fontSize:16,fontWeight:700,color:T.white,cursor:'pointer'}}>
           閉じる
         </button>
       </div>
@@ -1711,11 +1720,11 @@ function ProfileScreen({ userName, streak, onNameChange, onGoNotif }) {
 
       {/* アバター＋名前 */}
       <div style={{textAlign:'center',marginBottom:24,position:'relative',zIndex:editing?60:1}}>
-        <div style={{width:88,height:88,borderRadius:'50%',background:`linear-gradient(135deg,${T.sage},${T.sageL})`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:40,margin:'0 auto 12px',boxShadow:`0 6px 24px ${T.sage}44`}}>
+        <div style={{width:88,height:88,borderRadius:'50%',background:T.sage,display:'flex',alignItems:'center',justifyContent:'center',fontSize:40,margin:'0 auto 12px'}}>
           🌱
         </div>
         {editing ? (
-          <div style={{background:T.white,borderRadius:20,padding:'20px',boxShadow:'0 8px 32px rgba(0,0,0,0.18)',display:'inline-flex',flexDirection:'column',alignItems:'center',gap:12,minWidth:240}}>
+          <div style={{background:T.white,borderRadius:10,padding:'20px',display:'inline-flex',flexDirection:'column',alignItems:'center',gap:12,minWidth:240}}>
             <p style={{fontSize:13,fontWeight:700,color:T.inkL,margin:0}}>ニックネームを編集</p>
             <input
               value={nameInput}
@@ -1764,7 +1773,7 @@ function ProfileScreen({ userName, streak, onNameChange, onGoNotif }) {
         </div>
         <button onClick={onGoNotif}
           style={{width:'100%',marginTop:12,padding:'10px 0',borderRadius:12,
-            border:`1.5px solid ${T.border}`,background:T.sageXL,
+            border:`1px solid ${T.border}`,background:T.sageXL,
             color:T.sage,fontWeight:700,fontSize:14,
             cursor:'pointer',fontFamily:'inherit'}}>
           🔔 通知設定を変更する →
@@ -1814,7 +1823,7 @@ function ProfileScreen({ userName, streak, onNameChange, onGoNotif }) {
         <p style={{fontSize:12,color:T.inkL,marginBottom:12}}>ストリーク・履歴・目標がすべて削除されます</p>
         {!resetConfirm ? (
           <button onClick={() => setResetConfirm(true)}
-            style={{width:'100%',padding:12,borderRadius:12,border:`1.5px solid ${T.rose}`,background:'transparent',color:T.rose,fontWeight:700,fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>
+            style={{width:'100%',padding:12,borderRadius:12,border:`1px solid ${T.rose}`,background:'transparent',color:T.rose,fontWeight:700,fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>
             リセットする
           </button>
         ) : (
@@ -1954,13 +1963,13 @@ const NAV_UPDATED = [
 
 function BottomNavNew({ current, onChange }) {
   return (
-    <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:430,background:'rgba(250,247,242,0.96)',backdropFilter:'blur(16px)',borderTop:`1px solid ${T.border}`,display:'flex',zIndex:100}}>
+    <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:430,background:T.white,borderTop:`1px solid ${T.border}`,display:'flex',zIndex:100}}>
       {NAV_UPDATED.map(n => (
         <button key={n.id} onClick={() => { haptic('light'); onChange(n.id); }}
-          style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',padding:'10px 0 12px',background:'none',border:'none',cursor:'pointer',position:'relative',gap:3}}>
-          <span style={{fontSize:20,filter:current===n.id?'none':'grayscale(0.6) opacity(0.55)'}}>{n.icon}</span>
-          <span style={{fontSize:9,fontWeight:current===n.id?'700':'400',color:current===n.id?T.sage:T.inkL}}>{n.label}</span>
-          {current===n.id && <div style={{position:'absolute',bottom:0,left:'50%',transform:'translateX(-50%)',width:24,height:3,background:T.sage,borderRadius:'99px 99px 0 0'}}/>}
+          style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',padding:'10px 0 10px',background:'none',border:'none',cursor:'pointer',position:'relative',gap:2}}>
+          <span style={{fontSize:17,opacity:current===n.id?1:0.35}}>{n.icon}</span>
+          <span style={{fontSize:9,fontWeight:current===n.id?700:400,color:current===n.id?T.sage:T.inkL,letterSpacing:'0.02em'}}>{n.label}</span>
+          {current===n.id && <div style={{position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:20,height:2,background:T.sage}}/>}
         </button>
       ))}
     </div>
