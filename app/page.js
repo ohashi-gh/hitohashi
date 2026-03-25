@@ -506,7 +506,7 @@ function ChallengeRunner({ challenge, onComplete, onBack }) {
   return (
     <div style={{minHeight:'100vh',background:T.sageXL,display:'flex',flexDirection:'column',maxWidth:430,margin:'0 auto'}}>
       {/* Header */}
-      <div style={{padding:'52px 20px 12px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+      <div style={{padding:'36px 20px 10px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <button onClick={() => { stopSpeak(); haptic('light'); onBack(); }}
           style={{background:'rgba(255,255,255,0.85)',border:'none',borderRadius:12,width:40,height:40,fontSize:18,cursor:'pointer'}}>←</button>
         <div style={{textAlign:'center'}}>
@@ -629,8 +629,8 @@ function ChallengePicker({ onSelect, onBack }) {
   const filtered = filter === '全て' ? CHALLENGES : CHALLENGES.filter(c => c.cat === filter);
 
   return (
-    <div style={{padding:'0 16px 100px'}}>
-      <div style={{padding:'52px 0 16px',display:'flex',alignItems:'center',gap:12}}>
+    <div style={{padding:'0 16px 80px'}}>
+      <div style={{padding:'36px 0 12px',display:'flex',alignItems:'center',gap:12}}>
         <button onClick={onBack} style={{background:T.sageXL,border:'none',borderRadius:12,width:40,height:40,fontSize:18,cursor:'pointer'}}>←</button>
         <div>
           <h2 style={{fontSize:20,fontWeight:900,color:T.ink}}>チャレンジを選ぶ</h2>
@@ -683,8 +683,8 @@ const SAMPLE_POSTS = [
 function HomeScreen({ onStart, onPick, onGoBoard, todayDone, streak }) {
   const tc = getTodayChallenge();
   return (
-    <div style={{padding:'0 16px 100px'}}>
-      <div style={{padding:'52px 0 20px'}}>
+    <div style={{padding:'0 16px 80px'}}>
+      <div style={{padding:'36px 0 16px'}}>
         <p style={{fontSize:13,color:T.inkL,marginBottom:4,letterSpacing:'0.06em'}}>今日も</p>
         <h1 style={{fontSize:28,fontWeight:900,color:T.ink,lineHeight:1.2}}>ひとあし、<br/>踏み出そう。</h1>
         {streak > 0 &&
@@ -807,8 +807,8 @@ function BoardScreen() {
   }
 
   return (
-    <div style={{padding:'0 16px 100px'}}>
-      <div style={{padding:'52px 0 18px'}}>
+    <div style={{padding:'0 16px 80px'}}>
+      <div style={{padding:'36px 0 14px'}}>
         <h2 style={{fontSize:22,fontWeight:900,color:T.ink}}>みんなのストーリー 💬</h2>
         <p style={{fontSize:13,color:T.inkL,marginTop:4}}>匿名で、素直な気持ちを共有しよう</p>
       </div>
@@ -954,8 +954,8 @@ function GoalsScreen() {
   const totalTarget = goals.reduce((a, g) => a + g.freq, 0);
 
   return (
-    <div style={{padding:'0 16px 100px'}}>
-      <div style={{padding:'52px 0 20px'}}>
+    <div style={{padding:'0 16px 80px'}}>
+      <div style={{padding:'36px 0 16px'}}>
         <h2 style={{fontSize:22,fontWeight:900,color:T.ink}}>目標設定 🎯</h2>
         <p style={{fontSize:13,color:T.inkL,marginTop:4}}>続けたいことを決めて、習慣にしよう</p>
       </div>
@@ -1087,8 +1087,8 @@ function DashScreen({ streak, history }) {
   const DAYS = ['月','火','水','木','金','土','日'];
 
   return (
-    <div style={{padding:'0 16px 100px'}}>
-      <div style={{padding:'52px 0 20px'}}>
+    <div style={{padding:'0 16px 80px'}}>
+      <div style={{padding:'36px 0 16px'}}>
         <h2 style={{fontSize:22,fontWeight:900,color:T.ink}}>成長の記録 📊</h2>
         <p style={{fontSize:13,color:T.inkL,marginTop:4}}>続けてきた自分を振り返ろう</p>
       </div>
@@ -1241,8 +1241,8 @@ function NotifScreen({ onBack }) {
   }
 
   return (
-    <div style={{padding:'0 16px 120px'}}>
-      <div style={{padding:'52px 0 20px',display:'flex',alignItems:'center',gap:12}}>
+    <div style={{padding:'0 16px 88px'}}>
+      <div style={{padding:'36px 0 16px',display:'flex',alignItems:'center',gap:12}}>
         {onBack && (
           <button onClick={onBack}
             style={{background:T.sageXL,border:'none',borderRadius:12,width:40,height:40,fontSize:18,cursor:'pointer',flexShrink:0}}>←</button>
@@ -1530,7 +1530,7 @@ function OnboardingScreen({ onFinish }) {
 
       {/* 最終スライド：設定 */}
       {isLast && (
-        <div style={{flex:1,background:T.sageXL,display:'flex',flexDirection:'column',padding:'52px 24px 32px',animation:'fadeUp 0.4s ease'}}>
+        <div style={{flex:1,background:T.sageXL,display:'flex',flexDirection:'column',padding:'36px 24px 28px',animation:'fadeUp 0.4s ease'}}>
           <div style={{textAlign:'center',marginBottom:32}}>
             <div style={{fontSize:64,marginBottom:16}}>👋</div>
             <h1 style={{fontSize:24,fontWeight:900,color:T.ink,marginBottom:8}}>はじめましょう！</h1>
@@ -1704,7 +1704,7 @@ function ProfileScreen({ userName, streak, onNameChange, onGoNotif }) {
     : '通知オフ';
 
   return (
-    <div style={{padding:'0 16px 100px',position:'relative'}}>
+    <div style={{padding:'0 16px 80px',position:'relative'}}>
 
       {/* ── 編集中オーバーレイ：背景を操作不能にする ── */}
       {editing && (
@@ -1714,7 +1714,7 @@ function ProfileScreen({ userName, streak, onNameChange, onGoNotif }) {
         />
       )}
 
-      <div style={{padding:'52px 0 20px'}}>
+      <div style={{padding:'36px 0 16px'}}>
         <h2 style={{fontSize:22,fontWeight:900,color:T.ink}}>プロフィール 👤</h2>
       </div>
 
@@ -1870,8 +1870,8 @@ function HistoryScreen({ history }) {
   const MONTHS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
 
   return (
-    <div style={{padding:'0 16px 100px'}}>
-      <div style={{padding:'52px 0 20px'}}>
+    <div style={{padding:'0 16px 80px'}}>
+      <div style={{padding:'36px 0 16px'}}>
         <h2 style={{fontSize:22,fontWeight:900,color:T.ink}}>チャレンジ履歴 📅</h2>
         <p style={{fontSize:13,color:T.inkL,marginTop:4}}>積み重ねた記録を振り返ろう</p>
       </div>
@@ -1966,7 +1966,7 @@ function BottomNavNew({ current, onChange }) {
     <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:430,background:T.white,borderTop:`1px solid ${T.border}`,display:'flex',zIndex:100}}>
       {NAV_UPDATED.map(n => (
         <button key={n.id} onClick={() => { haptic('light'); onChange(n.id); }}
-          style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',padding:'10px 0 10px',background:'none',border:'none',cursor:'pointer',position:'relative',gap:2}}>
+          style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 12px',background:'none',border:'none',cursor:'pointer',position:'relative',gap:3}}>
           <span style={{fontSize:17,opacity:current===n.id?1:0.35}}>{n.icon}</span>
           <span style={{fontSize:9,fontWeight:current===n.id?700:400,color:current===n.id?T.sage:T.inkL,letterSpacing:'0.02em'}}>{n.label}</span>
           {current===n.id && <div style={{position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:20,height:2,background:T.sage}}/>}
